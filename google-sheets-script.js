@@ -25,6 +25,7 @@ function doPost(e) {
     // Auto-create beautiful headers if sheet is empty
     if (sheet.getLastRow() === 0) {
       var headers = [
+        "Type",
         "Date", 
         "Time", 
         "Amount ($)", 
@@ -64,8 +65,10 @@ function doPost(e) {
       var dateObj = item.date ? new Date(item.date) : new Date();
       var formattedDate = item.dateStr || Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "yyyy-MM-dd");
       var formattedTime = item.timeStr || Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "HH:mm:ss");
-      
+      var typeStr = (item.type === "income" || item.type === "Income") ? "Income" : "Expense";
+
       rowsToAdd.push([
+        typeStr,
         formattedDate,
         formattedTime,
         parseFloat(item.amount || 0),
@@ -79,11 +82,11 @@ function doPost(e) {
 
     if (rowsToAdd.length > 0) {
       var startRow = sheet.getLastRow() + 1;
-      var range = sheet.getRange(startRow, 1, rowsToAdd.length, 8);
+      var range = sheet.getRange(startRow, 1, rowsToAdd.length, 9);
       range.setValues(rowsToAdd);
       
-      // Format Amount column (Column C) as currency
-      sheet.getRange(startRow, 3, rowsToAdd.length, 1).setNumberFormat("$#,##0.00");
+      // Format Amount column (Column D) as currency
+      sheet.getRange(startRow, 4, rowsToAdd.length, 1).setNumberFormat("$#,##0.00");
     }
 
     return ContentService.createTextOutput(JSON.stringify({

@@ -369,6 +369,58 @@ html, body {
   gap: 14px;
 }
 
+/* Mode Switch: Expense vs Income */
+.entry-mode-switch {
+  display: flex;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  position: relative;
+}
+
+.mode-tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.mode-tab-btn.active[data-mode="expense"] {
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #ff6b81;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.2);
+}
+
+.mode-tab-btn.active[data-mode="income"] {
+  background: var(--primary-subtle);
+  border: 1px solid var(--primary-glow);
+  color: var(--primary-light);
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
+.amount-display-container.income-mode {
+  border-color: var(--primary);
+  box-shadow: 0 0 20px var(--primary-glow);
+}
+
+.amount-display-container.income-mode .currency-symbol,
+.amount-display-container.income-mode .amount-text {
+  color: var(--primary-light);
+}
+
 /* Large Amount Display */
 .amount-display-container {
   display: flex;
@@ -1086,6 +1138,163 @@ html, body {
   border-radius: var(--radius-md);
   padding: 18px;
   margin-bottom: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Cash Flow Overview */
+.cashflow-card {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(21, 29, 47, 0.95) 50%, rgba(244, 63, 94, 0.05) 100%);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.cashflow-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cashflow-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 3px;
+}
+
+.cashflow-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.cashflow-value {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.income-item .cashflow-value {
+  color: var(--primary-light);
+}
+
+.expense-item .cashflow-value {
+  color: #ff6b81;
+}
+
+.net-item .cashflow-value {
+  color: #ffffff;
+}
+
+/* Category Budget Limits Meter List */
+.category-budget-meters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cat-budget-meter {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cat-budget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cat-budget-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cat-budget-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cat-budget-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.cat-budget-name {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.cat-budget-numbers {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-display);
+}
+
+.cat-budget-spent {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.cat-budget-limit {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.cat-budget-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.cat-budget-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 400ms ease;
+}
+
+.cat-budget-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.cat-budget-remaining.safe {
+  color: var(--primary-light);
+  font-weight: 600;
+}
+
+.cat-budget-remaining.warn {
+  color: var(--accent-amber);
+  font-weight: 600;
+}
+
+.cat-budget-remaining.over {
+  color: var(--accent-rose);
+  font-weight: 700;
 }
 
 .card-caption {
@@ -1641,6 +1850,86 @@ input:checked + .slider:before {
   flex-shrink: 0;
 }
 
+/* Category Limits Editor in Settings */
+.category-limits-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.category-limit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  gap: 12px;
+}
+
+.cat-limit-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.cat-limit-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cat-limit-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.cat-limit-name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.cat-limit-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cat-limit-symbol {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.cat-limit-input {
+  width: 90px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  padding: 6px 8px;
+  color: var(--text-main);
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-align: right;
+  outline: none;
+}
+
+.cat-limit-input:focus {
+  border-color: var(--primary);
+}
+
+.tx-amount.income {
+  color: var(--primary-light);
+}
+
 /* ==========================================================================
    BOTTOM DOCK (NAVIGATION)
    ========================================================================== */
@@ -1662,7 +1951,9 @@ input:checked + .slider:before {
 }
 
 .dock-tab {
-  flex: 1;
+  flex: 1 1 0px;
+  min-width: 0;
+  width: 25%;
   background: none;
   border: none;
   display: flex;

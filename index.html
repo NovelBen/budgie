@@ -84,6 +84,12 @@
         <!-- The Speed Entry Card -->
         <div class="speed-entry-card">
           
+          <!-- Mode Toggle: Expense vs Income -->
+          <div class="entry-mode-switch" role="tablist" aria-label="Transaction Type">
+            <button type="button" class="mode-tab-btn active" id="modeExpenseBtn" data-mode="expense" role="tab" aria-selected="true">Expense</button>
+            <button type="button" class="mode-tab-btn" id="modeIncomeBtn" data-mode="income" role="tab" aria-selected="false">Income</button>
+          </div>
+
           <!-- Large Amount Display & Voice Trigger -->
           <div class="amount-display-container">
             <div class="currency-symbol" id="currencySymbol">$</div>
@@ -103,7 +109,7 @@
           <div id="voiceStatusHint" class="voice-status-hint hidden">Listening... Say e.g. "Lunch 15 dollars"</div>
 
           <!-- Quick Increment Preset Chips -->
-          <div class="quick-presets-row" aria-label="Quick amount additions">
+          <div class="quick-presets-row" id="quickPresetsRow" aria-label="Quick amount additions">
             <button type="button" class="preset-chip" data-add="5">+5</button>
             <button type="button" class="preset-chip" data-add="10">+10</button>
             <button type="button" class="preset-chip" data-add="20">+20</button>
@@ -192,7 +198,7 @@
             <span class="btn-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
             </span>
-            <span class="btn-text">Save Expense</span>
+            <span class="btn-text" id="submitBtnText">Save Expense</span>
             <span class="btn-ripple"></span>
           </button>
 
@@ -263,14 +269,33 @@
           </div>
         </div>
 
+        <!-- Cash Flow / Income & Expenses Overview Card -->
+        <div class="analytics-card cashflow-card">
+          <span class="card-caption">Monthly Cash Flow</span>
+          <div class="cashflow-grid">
+            <div class="cashflow-item income-item">
+              <span class="cashflow-label">Total Income</span>
+              <span class="cashflow-value" id="analyticsTotalIncome">+$0.00</span>
+            </div>
+            <div class="cashflow-item expense-item">
+              <span class="cashflow-label">Total Spent</span>
+              <span class="cashflow-value" id="analyticsTotalExpense">-$0.00</span>
+            </div>
+            <div class="cashflow-item net-item">
+              <span class="cashflow-label">Net Balance</span>
+              <span class="cashflow-value" id="analyticsNetBalance">$0.00</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Monthly Budget Overview Card -->
         <div class="analytics-card budget-meter-card">
           <div class="budget-meter-header">
             <div>
-              <span class="card-caption">Monthly Budget Status</span>
+              <span class="card-caption">Overall Budget Status</span>
               <div class="budget-main-numbers">
                 <span class="spent-number" id="analyticsSpent">$0.00</span>
-                <span class="limit-caption" id="analyticsBudgetLimit">of $2,000.00 budget</span>
+                <span class="limit-caption" id="analyticsBudgetLimit">of $2,000.00 total limit</span>
               </div>
             </div>
             <div class="budget-percentage-badge" id="budgetPercentageBadge">0%</div>
@@ -284,12 +309,12 @@
           <!-- Daily Spending Pace Projection -->
           <div class="daily-pace-container">
             <div class="pace-item">
-              <span class="pace-label">Remaining Spend</span>
+              <span class="pace-label">Remaining</span>
               <span class="pace-val" id="analyticsRemaining">$2,000.00</span>
             </div>
             <div class="pace-divider"></div>
             <div class="pace-item">
-              <span class="pace-label">Safe Daily Pace</span>
+              <span class="pace-label">Safe Pace</span>
               <span class="pace-val highlight" id="analyticsDailyPace">$66.60 / day</span>
             </div>
             <div class="pace-divider"></div>
@@ -297,6 +322,17 @@
               <span class="pace-label">Days Left</span>
               <span class="pace-val" id="analyticsDaysLeft">30</span>
             </div>
+          </div>
+        </div>
+
+        <!-- Per-Category Budget Limits Card -->
+        <div class="analytics-card">
+          <div class="section-title-row" style="margin-bottom: 12px;">
+            <h3 class="card-subtitle" style="margin-bottom: 0;">Category Budget Limits</h3>
+            <button type="button" class="text-link-btn" id="editBudgetsLinkBtn">Edit Limits</button>
+          </div>
+          <div class="category-budget-meters" id="categoryBudgetMeters">
+            <!-- Dynamically populated: Groceries, Gas, Misc, and custom categories -->
           </div>
         </div>
 
@@ -401,11 +437,16 @@
 
         <!-- Budget & Currency Preferences -->
         <div class="settings-card">
-          <h3 class="settings-title">Budget Preferences</h3>
+          <h3 class="settings-title">Income & Budget Preferences</h3>
           
           <div class="form-row">
             <div class="form-group flex-1">
-              <label for="monthlyBudgetInput" class="form-label">Monthly Budget Limit ($)</label>
+              <label for="monthlyIncomeInput" class="form-label">Expected Monthly Income ($)</label>
+              <input type="number" id="monthlyIncomeInput" class="form-input" min="0" step="100" value="3500">
+            </div>
+
+            <div class="form-group flex-1">
+              <label for="monthlyBudgetInput" class="form-label">Overall Monthly Budget ($)</label>
               <input type="number" id="monthlyBudgetInput" class="form-input" min="1" step="50" value="2000">
             </div>
 
@@ -436,6 +477,21 @@
           </div>
 
           <button type="button" id="savePreferencesBtn" class="action-btn primary-btn">Save Preferences</button>
+        </div>
+
+        <!-- Category Budgets Editor Card -->
+        <div class="settings-card" id="categoryBudgetsSettingsCard">
+          <div class="section-title-row" style="margin-bottom: 8px;">
+            <div>
+              <h3 class="settings-title">Category Monthly Budgets</h3>
+              <p class="settings-desc">Set monthly spending limits for Groceries, Gas, Misc, and more.</p>
+            </div>
+            <button type="button" id="openAddCategoryFromSettingsBtn" class="action-btn secondary-btn" style="padding: 6px 12px; font-size: 0.78rem;">+ New Category</button>
+          </div>
+          
+          <div class="category-limits-editor-list" id="categoryLimitsEditorList">
+            <!-- Dynamically populated category rows with limit inputs -->
+          </div>
         </div>
 
         <!-- Data Backup & CSV Export -->
@@ -528,10 +584,10 @@
 
       <button type="button" class="dock-tab" data-target="view-analytics" aria-label="Budgets & Analytics">
         <div class="tab-icon-wrap">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"></line>
-            <line x1="12" y1="20" x2="12" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="14"></line>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="12" width="4" height="8" rx="1.5"></rect>
+            <rect x="10" y="7" width="4" height="13" rx="1.5"></rect>
+            <rect x="17" y="3" width="4" height="17" rx="1.5"></rect>
           </svg>
         </div>
         <span class="tab-label">Insights</span>
@@ -570,6 +626,10 @@
           <div class="form-group">
             <label for="newCategoryName" class="form-label">Category Name</label>
             <input type="text" id="newCategoryName" class="form-input" placeholder="e.g. Pet Care, Hobbies, Gym" maxlength="24">
+          </div>
+          <div class="form-group">
+            <label for="newCategoryBudget" class="form-label">Monthly Budget Limit ($)</label>
+            <input type="number" id="newCategoryBudget" class="form-input" placeholder="e.g. 200" min="0" step="25" value="200">
           </div>
           <div class="form-group">
             <label class="form-label">Choose Icon</label>
