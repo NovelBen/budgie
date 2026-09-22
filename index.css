@@ -93,7 +93,8 @@ html, body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-width: 480px;
+  width: 100%;
+  max-width: 440px;
   margin: 0 auto;
   position: relative;
   background: var(--bg-base);
@@ -110,6 +111,10 @@ html, body {
     padding: 20px 0;
   }
   .app-container {
+    width: 440px !important;
+    min-width: 440px !important;
+    max-width: 440px !important;
+    flex: 0 0 440px !important;
     height: 94vh;
     max-height: 900px;
     border-radius: 36px;
@@ -258,6 +263,8 @@ html, body {
    ========================================================================== */
 .main-content {
   flex: 1;
+  width: 100% !important;
+  box-sizing: border-box !important;
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
@@ -266,7 +273,9 @@ html, body {
 
 .app-view {
   display: none;
-  padding: 16px;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 14px 16px;
   animation: fadeIn 220ms ease-out forwards;
 }
 
@@ -362,11 +371,13 @@ html, body {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 16px;
+  padding: 14px 16px;
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Mode Switch: Expense vs Income */
@@ -383,7 +394,7 @@ html, body {
   flex: 1;
   background: none;
   border: none;
-  padding: 8px 16px;
+  padding: 7px 14px;
   border-radius: var(--radius-pill);
   font-family: var(--font-display);
   font-size: 0.85rem;
@@ -430,7 +441,7 @@ html, body {
   background: var(--bg-input);
   border: 1.5px solid var(--border-highlight);
   border-radius: var(--radius-md);
-  padding: 14px 18px;
+  padding: 10px 16px;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -441,7 +452,7 @@ html, body {
 
 .currency-symbol {
   font-family: var(--font-display);
-  font-size: 2.2rem;
+  font-size: 2rem;
   font-weight: 700;
   color: var(--primary-light);
   margin-right: 6px;
@@ -449,11 +460,11 @@ html, body {
 
 .amount-text {
   font-family: var(--font-display);
-  font-size: 2.8rem;
+  font-size: 2.5rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--text-main);
-  min-width: 140px;
+  min-width: 120px;
   text-align: center;
 }
 
@@ -587,23 +598,36 @@ html, body {
 }
 
 .category-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  align-items: center;
   gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.category-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .category-chip {
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  padding: 10px 4px;
+  gap: 7px;
+  padding: 7px 14px;
   background: var(--bg-surface);
   border: 1.5px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   cursor: pointer;
   transition: all var(--transition-fast);
-  text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .category-chip:hover {
@@ -615,33 +639,30 @@ html, body {
   background: var(--primary-subtle);
   border-color: var(--primary);
   box-shadow: 0 0 14px var(--primary-glow);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .cat-icon {
-  width: 26px;
-  height: 26px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 5px;
+  margin-bottom: 0;
   color: var(--primary-light);
+  flex-shrink: 0;
 }
 
 .cat-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
 }
 
 .cat-name {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-secondary);
-  line-height: 1.1;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-  max-width: 90%;
+  line-height: 1;
 }
 
 .category-chip.selected .cat-name {
@@ -762,16 +783,17 @@ html, body {
 .tactile-keypad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 8px;
+  width: 100%;
 }
 
 .key-btn {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  padding: 14px;
+  padding: 11px 8px;
   font-family: var(--font-display);
-  font-size: 1.45rem;
+  font-size: 1.35rem;
   font-weight: 600;
   color: var(--text-main);
   cursor: pointer;
@@ -805,10 +827,10 @@ html, body {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   border: none;
   border-radius: var(--radius-md);
-  padding: 16px;
+  padding: 13px;
   color: #ffffff;
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 1.08rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   display: flex;
@@ -820,6 +842,28 @@ html, body {
   transition: all var(--transition-spring);
   position: relative;
   overflow: hidden;
+  width: 100%;
+}
+
+/* Down Low Section (Secondary Presets, Budget Glance, Details) */
+.down-low-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.down-low-section .budget-glance-card {
+  margin-bottom: 0;
+  background: linear-gradient(135deg, rgba(16, 22, 36, 0.85) 0%, rgba(12, 17, 28, 0.85) 100%);
+}
+
+.down-low-section .quick-presets-row {
+  margin-bottom: 0;
 }
 
 .primary-cta-btn:hover:not(:disabled) {

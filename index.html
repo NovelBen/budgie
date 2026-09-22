@@ -67,21 +67,7 @@
       <!-- ========================================== -->
       <section id="view-add" class="app-view active-view" aria-label="Speed Expense Entry">
         
-        <!-- Quick Budget Gauge Pill -->
-        <div class="budget-glance-card" id="budgetGlanceCard">
-          <div class="glance-info">
-            <span class="glance-label">Monthly Left</span>
-            <span class="glance-val" id="glanceRemaining">$1,250.00</span>
-          </div>
-          <div class="glance-track">
-            <div class="glance-fill" id="glanceFill" style="width: 35%;"></div>
-          </div>
-          <div class="glance-sub" id="glanceDailySafe">
-            Safe to spend: <strong id="glanceDailyAmount">$45.00/day</strong>
-          </div>
-        </div>
-
-        <!-- The Speed Entry Card -->
+        <!-- The Speed Entry Card (Zero Scrolling: Amount & Keypad Up Top) -->
         <div class="speed-entry-card">
           
           <!-- Mode Toggle: Expense vs Income -->
@@ -108,67 +94,7 @@
 
           <div id="voiceStatusHint" class="voice-status-hint hidden">Listening... Say e.g. "Lunch 15 dollars"</div>
 
-          <!-- Quick Increment Preset Chips -->
-          <div class="quick-presets-row" id="quickPresetsRow" aria-label="Quick amount additions">
-            <button type="button" class="preset-chip" data-add="5">+5</button>
-            <button type="button" class="preset-chip" data-add="10">+10</button>
-            <button type="button" class="preset-chip" data-add="20">+20</button>
-            <button type="button" class="preset-chip" data-add="50">+50</button>
-            <button type="button" class="preset-chip clear-chip" id="clearAmountBtn">Clear</button>
-          </div>
-
-          <!-- 1-Tap Category Grid -->
-          <div class="category-section">
-            <div class="section-title-row">
-              <span class="section-title">Select Category</span>
-              <button type="button" class="text-link-btn" id="manageCategoriesBtn">Custom</button>
-            </div>
-            
-            <div class="category-grid" id="categoryGrid" role="radiogroup" aria-label="Expense Categories">
-              <!-- Dynamically rendered & interactive -->
-            </div>
-          </div>
-
-          <!-- Collapsible Optional Details (Doesn't block fast entry) -->
-          <details class="optional-details-accordion" id="optionalDetails">
-            <summary class="details-summary">
-              <span class="summary-text">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="8" x2="12" y2="12"></line>
-                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                More details (Note, Payment method, Date)
-              </span>
-              <span class="chevron-icon">▾</span>
-            </summary>
-
-            <div class="details-body">
-              <div class="form-group">
-                <label for="expenseNoteInput" class="form-label">Note / Merchant</label>
-                <input type="text" id="expenseNoteInput" class="form-input" placeholder="e.g. Chipotle, Trader Joe's, Uber..." maxlength="80">
-              </div>
-
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label">Payment Method</label>
-                  <div class="method-chips" id="methodChips">
-                    <button type="button" class="method-chip active" data-method="Card">Card</button>
-                    <button type="button" class="method-chip" data-method="Cash">Cash</button>
-                    <button type="button" class="method-chip" data-method="Venmo">Venmo</button>
-                    <button type="button" class="method-chip" data-method="Other">Other</button>
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label for="expenseDateInput" class="form-label">Date</label>
-                  <input type="date" id="expenseDateInput" class="form-input date-input">
-                </div>
-              </div>
-            </div>
-          </details>
-
-          <!-- Tactile Keypad -->
+          <!-- Tactile Keypad (Right up top under amount display so you NEVER scroll to type!) -->
           <div class="tactile-keypad" id="numpad" aria-label="Numeric keypad">
             <button type="button" class="key-btn" data-key="1">1</button>
             <button type="button" class="key-btn" data-key="2">2</button>
@@ -193,7 +119,19 @@
             </button>
           </div>
 
-          <!-- Giant Log Expense CTA -->
+          <!-- 1-Tap Category Horizontal Scroll Bar (Groceries, Gas, Misc right at front) -->
+          <div class="category-section">
+            <div class="section-title-row">
+              <span class="section-title">Category</span>
+              <button type="button" class="text-link-btn" id="manageCategoriesBtn">+ Custom</button>
+            </div>
+            
+            <div class="category-grid category-hscroll" id="categoryGrid" role="radiogroup" aria-label="Expense Categories">
+              <!-- Dynamically rendered & interactive pills -->
+            </div>
+          </div>
+
+          <!-- Save CTA -->
           <button type="button" id="submitExpenseBtn" class="primary-cta-btn" disabled>
             <span class="btn-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -201,6 +139,75 @@
             <span class="btn-text" id="submitBtnText">Save Expense</span>
             <span class="btn-ripple"></span>
           </button>
+
+          <!-- ========================================================= -->
+          <!-- DOWN LOW SECTION (Secondary controls & status) -->
+          <!-- ========================================================= -->
+          <div class="down-low-section">
+            
+            <!-- Quick Increment Preset Chips -->
+            <div class="quick-presets-row" id="quickPresetsRow" aria-label="Quick amount additions">
+              <button type="button" class="preset-chip" data-add="5">+5</button>
+              <button type="button" class="preset-chip" data-add="10">+10</button>
+              <button type="button" class="preset-chip" data-add="20">+20</button>
+              <button type="button" class="preset-chip" data-add="50">+50</button>
+              <button type="button" class="preset-chip clear-chip" id="clearAmountBtn">Clear</button>
+            </div>
+
+            <!-- Quick Budget Gauge Pill (Moved Down Low) -->
+            <div class="budget-glance-card" id="budgetGlanceCard">
+              <div class="glance-info">
+                <span class="glance-label">Monthly Left</span>
+                <span class="glance-val" id="glanceRemaining">$1,250.00</span>
+              </div>
+              <div class="glance-track">
+                <div class="glance-fill" id="glanceFill" style="width: 35%;"></div>
+              </div>
+              <div class="glance-sub" id="glanceDailySafe">
+                Safe to spend: <strong id="glanceDailyAmount">$45.00/day</strong>
+              </div>
+            </div>
+
+            <!-- Collapsible Optional Details (Moved Down Low) -->
+            <details class="optional-details-accordion" id="optionalDetails">
+              <summary class="details-summary">
+                <span class="summary-text">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  More details (Note, Payment method, Date)
+                </span>
+                <span class="chevron-icon">▾</span>
+              </summary>
+
+              <div class="details-body">
+                <div class="form-group">
+                  <label for="expenseNoteInput" class="form-label">Note / Merchant</label>
+                  <input type="text" id="expenseNoteInput" class="form-input" placeholder="e.g. Chipotle, Trader Joe's, Shell..." maxlength="80">
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label class="form-label">Payment Method</label>
+                    <div class="method-chips" id="methodChips">
+                      <button type="button" class="method-chip active" data-method="Card">Card</button>
+                      <button type="button" class="method-chip" data-method="Cash">Cash</button>
+                      <button type="button" class="method-chip" data-method="Venmo">Venmo</button>
+                      <button type="button" class="method-chip" data-method="Other">Other</button>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="expenseDateInput" class="form-label">Date</label>
+                    <input type="date" id="expenseDateInput" class="form-input date-input">
+                  </div>
+                </div>
+              </div>
+            </details>
+
+          </div>
 
         </div>
 
