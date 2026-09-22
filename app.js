@@ -641,6 +641,7 @@
 
       state.recurringRules.push(newRule);
       saveRecurringRules();
+      pushSettingsToSheets();
       renderRecurringList();
 
       dom.expenseIsRecurringToggle.checked = false;
@@ -779,6 +780,98 @@
     state.syncQueue.push(tx);
     saveSyncQueue();
     processSyncQueue();
+  }
+
+  function pushSettingsToSheets() {
+    if (!state.settings.sheetsUrl) return;
+
+    const payload = {
+      action: 'saveSettings',
+      settings: {
+        expectedIncome: state.settings.expectedIncome,
+        monthlyBudget: state.settings.monthlyBudget,
+        currency: state.settings.currency,
+        haptics: state.settings.haptics
+      },
+      categories: state.categories.map(c => ({
+        id: c.id,
+        name: c.name,
+        color: c.color,
+        icon: c.icon,
+        budgetLimit: c.budgetLimit
+      })),
+      recurringRules: state.recurringRules
+    };
+
+    // Replace any previous saveSettings in queue
+    state.syncQueue = state.syncQueue.filter(item => item.action !== 'saveSettings');
+    state.syncQueue.push(payload);
+    saveSyncQueue();
+    processSyncQueue();
+  }
+
+  async function pullSettingsFromSheets(force = false) {
+    if (!state.settings.sheetsUrl || !navigator.onLine) return;
+
+    try {
+      const response = await fetch(state.settings.sheetsUrl, { method: 'GET' });
+      const data = await response.json();
+
+      if (data && data.settings) {
+        const remote = data.settings;
+        let hasChanges = false;
+
+        const isLocalDefault = (state.settings.expectedIncome === 3500 && state.settings.monthlyBudget === 2000);
+
+        if ((force || isLocalDefault) && remote.settings) {
+          if (typeof remote.settings.expectedIncome === 'number') {
+            state.settings.expectedIncome = remote.settings.expectedIncome;
+            hasChanges = true;
+          }
+          if (typeof remote.settings.monthlyBudget === 'number') {
+            state.settings.monthlyBudget = remote.settings.monthlyBudget;
+            hasChanges = true;
+          }
+          if (remote.settings.currency) {
+            state.settings.currency = remote.settings.currency;
+            hasChanges = true;
+          }
+          if (typeof remote.settings.haptics === 'boolean') {
+            state.settings.haptics = remote.settings.haptics;
+          }
+          saveSettings();
+        }
+
+        if (Array.isArray(remote.categories) && remote.categories.length > 0) {
+          remote.categories.forEach(rc => {
+            const localCat = state.categories.find(c => c.id === rc.id || c.name === rc.name);
+            if (localCat && typeof rc.budgetLimit === 'number' && rc.budgetLimit !== localCat.budgetLimit) {
+              localCat.budgetLimit = rc.budgetLimit;
+              hasChanges = true;
+            }
+          });
+          if (hasChanges) saveCategories();
+        }
+
+        if (Array.isArray(remote.recurringRules) && remote.recurringRules.length > 0 && state.recurringRules.length === 0) {
+          state.recurringRules = remote.recurringRules;
+          saveRecurringRules();
+          renderRecurringList();
+          hasChanges = true;
+        }
+
+        if (hasChanges) {
+          loadSettingsIntoDom();
+          renderGlanceBar();
+          renderAnalytics();
+          renderHistoryFeed();
+          renderCategoryLimitsEditor();
+          showToast('Preferences Synced', 'Budget & income loaded from Google Sheet', 'cloud');
+        }
+      }
+    } catch (err) {
+      console.warn('Budgie: Pull settings from sheets:', err);
+    }
   }
 
   function sendDeleteSync(txId) {
@@ -1373,6 +1466,7 @@
           targetCat.budgetLimit = newLimit;
           saveCategories();
           renderCategoryBudgetMeters(getMonthSpendMetrics().categoryTotals);
+          pushSettingsToSheets();
           showToast('Limit Updated', `${targetCat.name} limit set to ${sym}${newLimit}`, 'check');
         }
       });
@@ -1392,8 +1486,8 @@
     updateSyncStatusBadge(state.settings.sheetsUrl ? 'online' : 'local');
   }
 
-  function saveGeneralSettings() {
-    triggerHaptic(15);
+  function saveGeneralSettings(showNotification = true) {
+    if (showNotification) triggerHaptic(15);
     const incomeVal = parseFloat(dom.monthlyIncomeInput.value);
     if (!isNaN(incomeVal) && incomeVal >= 0) {
       state.settings.expectedIncome = incomeVal;
@@ -1409,12 +1503,15 @@
     dom.currencySymbol.textContent = state.entryMode === 'income' ? '+' + state.settings.currency : state.settings.currency;
 
     saveSettings();
+    pushSettingsToSheets();
     renderGlanceBar();
     renderAnalytics();
     renderHistoryFeed();
     renderCategoryLimitsEditor();
 
-    showToast('Settings Saved', 'Preferences updated successfully', 'settings');
+    if (showNotification) {
+      showToast('Settings Saved', 'Preferences saved & synced to sheet', 'settings');
+    }
   }
 
   function saveGoogleSheetsUrl() {
@@ -1459,8 +1556,10 @@
         })
       });
 
-      showCallout('Connection successful! Your Google Sheet is linked and ready.', 'success');
+      pushSettingsToSheets();
+      showCallout('Connection successful! Google Sheet linked & budget preferences synced.', 'success');
       updateSyncStatusBadge('online');
+      pullSettingsFromSheets(false);
     } catch (err) {
       showCallout('Connection failed: ' + err.message, 'error');
       updateSyncStatusBadge('error');
@@ -1772,6 +1871,7 @@
 
     rule.active = !rule.active;
     saveRecurringRules();
+    pushSettingsToSheets();
     renderRecurringList();
     renderAnalytics();
 
@@ -1784,6 +1884,7 @@
 
     const removed = state.recurringRules.splice(idx, 1)[0];
     saveRecurringRules();
+    pushSettingsToSheets();
     renderRecurringList();
     renderAnalytics();
 
@@ -1899,6 +2000,7 @@
         }
 
         saveRecurringRules();
+        pushSettingsToSheets();
         renderRecurringList();
         renderAnalytics();
         checkAndProcessRecurring();
@@ -2166,7 +2268,21 @@
       renderHistoryFeed();
     });
 
-    dom.savePreferencesBtn.addEventListener('click', saveGeneralSettings);
+    dom.savePreferencesBtn.addEventListener('click', () => saveGeneralSettings(true));
+
+    // Auto-save settings on input and change
+    let autoSaveTimer = null;
+    const triggerAutoSave = () => {
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        saveGeneralSettings(false);
+      }, 350);
+    };
+
+    dom.monthlyIncomeInput.addEventListener('input', triggerAutoSave);
+    dom.monthlyBudgetInput.addEventListener('input', triggerAutoSave);
+    dom.currencySelect.addEventListener('change', () => saveGeneralSettings(false));
+    dom.hapticsToggle.addEventListener('change', () => saveGeneralSettings(false));
     dom.saveSheetUrlBtn.addEventListener('click', saveGoogleSheetsUrl);
     dom.testSheetConnBtn.addEventListener('click', testGoogleSheetsConnection);
     dom.syncPendingBtn.addEventListener('click', () => {
@@ -2366,6 +2482,10 @@
 
     if (state.syncQueue.length > 0 && navigator.onLine && state.settings.sheetsUrl) {
       processSyncQueue();
+    }
+
+    if (state.settings.sheetsUrl && navigator.onLine) {
+      pullSettingsFromSheets(false);
     }
   }
 
