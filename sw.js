@@ -1,4 +1,4 @@
-const CACHE_NAME = 'budgie-cache-v1';
+const CACHE_NAME = 'budgie-cache-v3';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -11,12 +11,13 @@ const CORE_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(CORE_ASSETS).catch((err) => {
         console.warn('Budgie: Pre-caching non-fatal asset issue:', err);
       });
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -40,23 +41,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first for dynamic, cache-fallback for offline reliability
+  // Network-First: Fetch fresh from network when online, fallback to cache if offline
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
           });
         }
         return networkResponse;
-      }).catch(() => {
-        // Fallback to cache if network fails (offline)
-        return cachedResponse;
-      });
-
-      return cachedResponse || fetchPromise;
-    })
+      })
+      .catch(() => {
+        return caches.match(event.request);
+      })
   );
 });

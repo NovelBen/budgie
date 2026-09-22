@@ -597,6 +597,18 @@ html, body {
   cursor: pointer;
 }
 
+.text-link-btn.danger-link {
+  color: var(--accent-rose);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+
+.text-link-btn.danger-link:hover {
+  color: #ff2d55;
+  text-decoration: underline;
+}
+
 .category-grid {
   display: flex;
   align-items: center;

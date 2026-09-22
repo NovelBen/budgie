@@ -253,6 +253,8 @@
     dom.exportJsonBtn = document.getElementById('exportJsonBtn');
     dom.importJsonInput = document.getElementById('importJsonInput');
     dom.resetDataBtn = document.getElementById('resetDataBtn');
+    dom.forceUpdateBtn = document.getElementById('forceUpdateBtn');
+    dom.clearAllHistoryBtn = document.getElementById('clearAllHistoryBtn');
 
     // Navigation & Modals
     dom.dockTabs = document.querySelectorAll('.dock-tab');
@@ -1668,22 +1670,114 @@
     dom.exportJsonBtn.addEventListener('click', exportToJson);
     dom.importJsonInput.addEventListener('change', restoreFromJson);
 
-    dom.resetDataBtn.addEventListener('click', () => {
-      triggerHaptic(20);
-      if (confirm('Clear all transactions and start fresh at $0.00? Your categories and budget limits will be preserved.')) {
-        state.transactions = [];
-        state.syncQueue = [];
-        saveTransactions();
-        saveSyncQueue();
-        renderCategoryGrid();
-        renderCategoryFilterPills();
-        renderGlanceBar();
-        renderHistoryFeed();
-        renderAnalytics();
-        renderCategoryLimitsEditor();
-        showToast('All Cleared', 'Transactions cleared. Ready for real expenses!', 'check');
-      }
-    });
+    function clearAllTransactionsAction() {
+      state.transactions = [];
+      state.syncQueue = [];
+      saveTransactions();
+      saveSyncQueue();
+      renderCategoryGrid();
+      renderCategoryFilterPills();
+      renderGlanceBar();
+      renderHistoryFeed();
+      renderAnalytics();
+      renderCategoryLimitsEditor();
+      showToast('All Cleared', 'Transactions cleared. Ready for real expenses!', 'check');
+    }
+
+    let resetConfirmTimeout = null;
+    let isResetConfirming = false;
+
+    if (dom.resetDataBtn) {
+      dom.resetDataBtn.addEventListener('click', () => {
+        triggerHaptic(20);
+        if (!isResetConfirming) {
+          isResetConfirming = true;
+          dom.resetDataBtn.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+          dom.resetDataBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            Tap Again to Confirm Clear
+          `;
+          resetConfirmTimeout = setTimeout(() => {
+            isResetConfirming = false;
+            dom.resetDataBtn.style.background = '';
+            dom.resetDataBtn.innerHTML = `
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Clear All Transactions (Start Fresh)
+            `;
+          }, 4500);
+        } else {
+          clearTimeout(resetConfirmTimeout);
+          isResetConfirming = false;
+          dom.resetDataBtn.style.background = '';
+          dom.resetDataBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            Clear All Transactions (Start Fresh)
+          `;
+          clearAllTransactionsAction();
+        }
+      });
+    }
+
+    if (dom.clearAllHistoryBtn) {
+      let isHistoryConfirming = false;
+      let historyTimeout = null;
+      dom.clearAllHistoryBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        triggerHaptic(20);
+        if (!isHistoryConfirming) {
+          isHistoryConfirming = true;
+          dom.clearAllHistoryBtn.textContent = 'Tap to confirm?';
+          dom.clearAllHistoryBtn.style.color = '#f59e0b';
+          historyTimeout = setTimeout(() => {
+            isHistoryConfirming = false;
+            dom.clearAllHistoryBtn.textContent = 'Clear All';
+            dom.clearAllHistoryBtn.style.color = '';
+          }, 4500);
+        } else {
+          clearTimeout(historyTimeout);
+          isHistoryConfirming = false;
+          dom.clearAllHistoryBtn.textContent = 'Clear All';
+          dom.clearAllHistoryBtn.style.color = '';
+          clearAllTransactionsAction();
+        }
+      });
+    }
+
+    if (dom.forceUpdateBtn) {
+      dom.forceUpdateBtn.addEventListener('click', async () => {
+        triggerHaptic(25);
+        showToast('Updating Budgie...', 'Clearing cache and reloading latest version...', 'refresh');
+        try {
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (let reg of regs) {
+              await reg.unregister();
+            }
+          }
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            for (let k of keys) {
+              await caches.delete(k);
+            }
+          }
+        } catch (err) {
+          console.warn('Error clearing caches:', err);
+        }
+        setTimeout(() => {
+          window.location.reload(true);
+        }, 500);
+      });
+    }
 
     dom.copyAppsScriptBtn.addEventListener('click', async () => {
       triggerHaptic(15);

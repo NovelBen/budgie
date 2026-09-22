@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="index.css?v=3">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -219,7 +219,10 @@
       <section id="view-history" class="app-view" aria-label="Transaction History">
         
         <div class="view-header">
-          <h2 class="view-title">Transactions</h2>
+          <div class="section-title-row" style="margin-bottom: 4px;">
+            <h2 class="view-title" style="margin-bottom: 0;">Transactions</h2>
+            <button type="button" class="text-link-btn danger-link" id="clearAllHistoryBtn">Clear All</button>
+          </div>
           <div class="history-stats">
             <span id="historyCount">0 entries</span>
             <span class="dot-separator">•</span>
@@ -541,6 +544,13 @@
               </svg>
               Clear All Transactions (Start Fresh)
             </button>
+
+            <button type="button" id="forceUpdateBtn" class="action-btn outline-btn" style="margin-top: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+              </svg>
+              Check for App Updates / Reload
+            </button>
           </div>
         </div>
 
@@ -691,6 +701,6 @@
 
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
