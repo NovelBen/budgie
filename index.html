@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Budgie - Personal Budget & Speed Expense Tracker</title>
+  
+  <!-- PWA & Mobile Web Capabilities -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#080b12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Budgie">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="Lightning-fast personal budgeting and expense tracking app for Android and desktop.">
+
+  <!-- Icons -->
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    
+    <!-- Top Bar -->
+    <header class="top-nav">
+      <div class="brand">
+        <div class="brand-logo-wrap">
+          <img src="icons/icon.svg" alt="Budgie Logo" class="brand-logo" width="34" height="34">
+          <div class="logo-pulse"></div>
+        </div>
+        <div class="brand-text">
+          <span class="app-title">Budgie</span>
+          <span class="app-subtitle" id="currentMonthYear">September 2026</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Sync Indicator Badge -->
+        <button id="syncStatusBadge" class="sync-badge" title="Google Sheets Sync Status" aria-label="Sync Status">
+          <span class="status-dot"></span>
+          <span class="sync-text" id="syncStatusText">Local</span>
+        </button>
+
+        <!-- Install PWA Button (hidden when already installed) -->
+        <button id="installPwaBtn" class="icon-btn install-btn hidden" title="Install App to Home Screen" aria-label="Install App">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- ========================================== -->
+      <!-- VIEW 1: SPEED ADD (DEFAULT) -->
+      <!-- ========================================== -->
+      <section id="view-add" class="app-view active-view" aria-label="Speed Expense Entry">
+        
+        <!-- Quick Budget Gauge Pill -->
+        <div class="budget-glance-card" id="budgetGlanceCard">
+          <div class="glance-info">
+            <span class="glance-label">Monthly Left</span>
+            <span class="glance-val" id="glanceRemaining">$1,250.00</span>
+          </div>
+          <div class="glance-track">
+            <div class="glance-fill" id="glanceFill" style="width: 35%;"></div>
+          </div>
+          <div class="glance-sub" id="glanceDailySafe">
+            Safe to spend: <strong id="glanceDailyAmount">$45.00/day</strong>
+          </div>
+        </div>
+
+        <!-- The Speed Entry Card -->
+        <div class="speed-entry-card">
+          
+          <!-- Large Amount Display & Voice Trigger -->
+          <div class="amount-display-container">
+            <div class="currency-symbol" id="currencySymbol">$</div>
+            <div class="amount-text" id="amountDisplay">0.00</div>
+            
+            <button id="voiceAddBtn" class="voice-btn" title="Voice Entry (e.g. 'Coffee 4 dollars')" aria-label="Voice expense entry">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+              <span class="voice-listening-ring"></span>
+            </button>
+          </div>
+
+          <div id="voiceStatusHint" class="voice-status-hint hidden">Listening... Say e.g. "Lunch 15 dollars"</div>
+
+          <!-- Quick Increment Preset Chips -->
+          <div class="quick-presets-row" aria-label="Quick amount additions">
+            <button type="button" class="preset-chip" data-add="5">+5</button>
+            <button type="button" class="preset-chip" data-add="10">+10</button>
+            <button type="button" class="preset-chip" data-add="20">+20</button>
+            <button type="button" class="preset-chip" data-add="50">+50</button>
+            <button type="button" class="preset-chip clear-chip" id="clearAmountBtn">Clear</button>
+          </div>
+
+          <!-- 1-Tap Category Grid -->
+          <div class="category-section">
+            <div class="section-title-row">
+              <span class="section-title">Select Category</span>
+              <button type="button" class="text-link-btn" id="manageCategoriesBtn">Custom</button>
+            </div>
+            
+            <div class="category-grid" id="categoryGrid" role="radiogroup" aria-label="Expense Categories">
+              <!-- Dynamically rendered & interactive -->
+            </div>
+          </div>
+
+          <!-- Collapsible Optional Details (Doesn't block fast entry) -->
+          <details class="optional-details-accordion" id="optionalDetails">
+            <summary class="details-summary">
+              <span class="summary-text">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                More details (Note, Payment method, Date)
+              </span>
+              <span class="chevron-icon">▾</span>
+            </summary>
+
+            <div class="details-body">
+              <div class="form-group">
+                <label for="expenseNoteInput" class="form-label">Note / Merchant</label>
+                <input type="text" id="expenseNoteInput" class="form-input" placeholder="e.g. Chipotle, Trader Joe's, Uber..." maxlength="80">
+              </div>
+
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label class="form-label">Payment Method</label>
+                  <div class="method-chips" id="methodChips">
+                    <button type="button" class="method-chip active" data-method="Card">💳 Card</button>
+                    <button type="button" class="method-chip" data-method="Cash">💵 Cash</button>
+                    <button type="button" class="method-chip" data-method="Venmo">📱 Venmo</button>
+                    <button type="button" class="method-chip" data-method="Other">🏦 Other</button>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="expenseDateInput" class="form-label">Date</label>
+                  <input type="date" id="expenseDateInput" class="form-input date-input">
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- Tactile Keypad -->
+          <div class="tactile-keypad" id="numpad" aria-label="Numeric keypad">
+            <button type="button" class="key-btn" data-key="1">1</button>
+            <button type="button" class="key-btn" data-key="2">2</button>
+            <button type="button" class="key-btn" data-key="3">3</button>
+            
+            <button type="button" class="key-btn" data-key="4">4</button>
+            <button type="button" class="key-btn" data-key="5">5</button>
+            <button type="button" class="key-btn" data-key="6">6</button>
+            
+            <button type="button" class="key-btn" data-key="7">7</button>
+            <button type="button" class="key-btn" data-key="8">8</button>
+            <button type="button" class="key-btn" data-key="9">9</button>
+            
+            <button type="button" class="key-btn dot-btn" data-key=".">.</button>
+            <button type="button" class="key-btn" data-key="0">0</button>
+            <button type="button" class="key-btn backspace-btn" data-key="backspace" aria-label="Backspace">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
+                <line x1="18" y1="9" x2="12" y2="15"></line>
+                <line x1="12" y1="9" x2="18" y2="15"></line>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Giant Log Expense CTA -->
+          <button type="button" id="submitExpenseBtn" class="primary-cta-btn" disabled>
+            <span class="btn-icon">✓</span>
+            <span class="btn-text">Save Expense</span>
+            <span class="btn-ripple"></span>
+          </button>
+
+        </div>
+
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW 2: TRANSACTIONS HISTORY -->
+      <!-- ========================================== -->
+      <section id="view-history" class="app-view" aria-label="Transaction History">
+        
+        <div class="view-header">
+          <h2 class="view-title">Transactions</h2>
+          <div class="history-stats">
+            <span id="historyCount">0 entries</span>
+            <span class="dot-separator">•</span>
+            <span id="historyTotalSpent">$0.00 spent</span>
+          </div>
+        </div>
+
+        <!-- History Search & Filter -->
+        <div class="filter-bar">
+          <div class="search-input-wrap">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="historySearchInput" class="search-input" placeholder="Search merchant, note, or category...">
+            <button id="clearSearchBtn" class="clear-search-btn hidden" aria-label="Clear search">×</button>
+          </div>
+
+          <!-- Category Filter Scroller -->
+          <div class="category-filter-pills" id="categoryFilterPills">
+            <button type="button" class="filter-pill active" data-filter="all">All</button>
+          </div>
+        </div>
+
+        <!-- Transactions Feed -->
+        <div class="transactions-feed" id="transactionsFeed">
+          <!-- Populated dynamically -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="historyEmptyState" class="empty-state hidden">
+          <div class="empty-icon">🪙</div>
+          <h3 class="empty-title">No transactions yet</h3>
+          <p class="empty-desc">Tap the ⚡ Add tab to log your first expense in 2 seconds.</p>
+        </div>
+
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW 3: BUDGETS & ANALYTICS -->
+      <!-- ========================================== -->
+      <section id="view-analytics" class="app-view" aria-label="Budgets and Analytics">
+        
+        <div class="view-header">
+          <h2 class="view-title">Insights & Budget</h2>
+          <div class="timeframe-toggle">
+            <button type="button" class="time-tab active" data-range="month">This Month</button>
+            <button type="button" class="time-tab" data-range="all">All Time</button>
+          </div>
+        </div>
+
+        <!-- Monthly Budget Overview Card -->
+        <div class="analytics-card budget-meter-card">
+          <div class="budget-meter-header">
+            <div>
+              <span class="card-caption">Monthly Budget Status</span>
+              <div class="budget-main-numbers">
+                <span class="spent-number" id="analyticsSpent">$0.00</span>
+                <span class="limit-caption" id="analyticsBudgetLimit">of $2,000.00 budget</span>
+              </div>
+            </div>
+            <div class="budget-percentage-badge" id="budgetPercentageBadge">0%</div>
+          </div>
+
+          <!-- Progress Bar with Dynamic Warning Color -->
+          <div class="budget-bar-track">
+            <div class="budget-bar-fill" id="analyticsBudgetBar" style="width: 0%;"></div>
+          </div>
+
+          <!-- Daily Spending Pace Projection -->
+          <div class="daily-pace-container">
+            <div class="pace-item">
+              <span class="pace-label">Remaining Spend</span>
+              <span class="pace-val" id="analyticsRemaining">$2,000.00</span>
+            </div>
+            <div class="pace-divider"></div>
+            <div class="pace-item">
+              <span class="pace-label">Safe Daily Pace</span>
+              <span class="pace-val highlight" id="analyticsDailyPace">$66.60 / day</span>
+            </div>
+            <div class="pace-divider"></div>
+            <div class="pace-item">
+              <span class="pace-label">Days Left</span>
+              <span class="pace-val" id="analyticsDaysLeft">30</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category Breakdown Chart Card -->
+        <div class="analytics-card">
+          <h3 class="card-subtitle">Spending by Category</h3>
+          
+          <div class="chart-container">
+            <!-- Visual SVG Donut Chart -->
+            <div class="donut-chart-wrap">
+              <svg id="categoryDonutChart" viewBox="0 0 200 200" width="180" height="180">
+                <!-- Slices rendered dynamically -->
+              </svg>
+              <div class="donut-center-info">
+                <span class="donut-label">Total</span>
+                <span class="donut-value" id="donutTotalAmount">$0</span>
+              </div>
+            </div>
+
+            <!-- Category Legend & Percentage Bars -->
+            <div class="category-bars-list" id="categoryBarsList">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Method Breakdown Card -->
+        <div class="analytics-card">
+          <h3 class="card-subtitle">Payment Breakdown</h3>
+          <div class="method-breakdown-row" id="methodBreakdownRow">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW 4: SETTINGS & GOOGLE SHEETS SYNC -->
+      <!-- ========================================== -->
+      <section id="view-settings" class="app-view" aria-label="Settings and Data Sync">
+        
+        <div class="view-header">
+          <h2 class="view-title">Settings & Sync</h2>
+        </div>
+
+        <!-- Google Sheets Background Sync Section -->
+        <div class="settings-card highlight-card">
+          <div class="settings-card-header">
+            <div class="settings-card-icon gsheets-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="3" y1="15" x2="21" y2="15"></line>
+                <line x1="9" y1="3" x2="9" y2="21"></line>
+                <line x1="15" y1="3" x2="15" y2="21"></line>
+              </svg>
+            </div>
+            <div>
+              <h3 class="settings-title">Google Sheets Auto-Sync</h3>
+              <p class="settings-desc">Expenses auto-append to your personal sheet in the background.</p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="sheetsWebhookInput" class="form-label">Google Apps Script Web App URL</label>
+            <input type="url" id="sheetsWebhookInput" class="form-input code-input" placeholder="https://script.google.com/macros/s/.../exec">
+            <span class="field-hint">Paste the URL from your deployed Google Apps Script.</span>
+          </div>
+
+          <div class="sheets-actions-row">
+            <button type="button" id="saveSheetUrlBtn" class="action-btn primary-btn">Save Webhook</button>
+            <button type="button" id="testSheetConnBtn" class="action-btn outline-btn">Test Connection</button>
+            <button type="button" id="syncPendingBtn" class="action-btn outline-btn">
+              Sync All Now <span id="pendingCountBadge" class="counter-badge">0</span>
+            </button>
+          </div>
+
+          <div id="sheetsStatusMsg" class="status-callout hidden"></div>
+
+          <!-- Expandable Step-by-Step Setup Guide -->
+          <details class="setup-guide-accordion">
+            <summary class="setup-summary">
+              <span>📋 Step-by-step: How to create your Google Sheet script</span>
+              <span class="chevron-icon">▾</span>
+            </summary>
+            <div class="setup-guide-content">
+              <ol class="setup-steps">
+                <li>Create a new blank spreadsheet in <a href="https://sheets.new" target="_blank" rel="noopener">Google Sheets</a> called <strong>Budgie Expenses</strong>.</li>
+                <li>In Google Sheets menu, click <strong>Extensions ➔ Apps Script</strong>.</li>
+                <li>Delete any default code, click <strong>Copy Script Code</strong> below, and paste it into the editor.</li>
+                <li>Click <strong>Deploy ➔ New deployment</strong>.</li>
+                <li>Select type: <strong>Web app</strong>. Set Execute as: <strong>Me</strong>. Set Who has access: <strong>Anyone</strong>.</li>
+                <li>Click <strong>Deploy</strong>, grant permissions (click "Advanced" ➔ "Go to Budgie Sync (unsafe)"), and copy the URL ending in <code>/exec</code>.</li>
+                <li>Paste the URL above!</li>
+              </ol>
+              <button type="button" id="copyAppsScriptBtn" class="action-btn secondary-btn copy-code-btn">
+                📋 Copy Apps Script Code to Clipboard
+              </button>
+            </div>
+          </details>
+        </div>
+
+        <!-- Budget & Currency Preferences -->
+        <div class="settings-card">
+          <h3 class="settings-title">Budget Preferences</h3>
+          
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="monthlyBudgetInput" class="form-label">Monthly Budget Limit ($)</label>
+              <input type="number" id="monthlyBudgetInput" class="form-input" min="1" step="50" value="2000">
+            </div>
+
+            <div class="form-group width-small">
+              <label for="currencySelect" class="form-label">Currency</label>
+              <select id="currencySelect" class="form-input select-input">
+                <option value="$">$ (USD)</option>
+                <option value="€">€ (EUR)</option>
+                <option value="£">£ (GBP)</option>
+                <option value="CA$">CA$ (CAD)</option>
+                <option value="A$">A$ (AUD)</option>
+                <option value="₹">₹ (INR)</option>
+                <option value="¥">¥ (JPY)</option>
+                <option value="CHF">CHF</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group toggle-group">
+            <div class="toggle-text">
+              <label for="hapticsToggle" class="toggle-title">Haptic Vibration on Tap</label>
+              <span class="toggle-sub">Subtle tactile vibration on Android button taps</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="hapticsToggle" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+
+          <button type="button" id="savePreferencesBtn" class="action-btn primary-btn">Save Preferences</button>
+        </div>
+
+        <!-- Data Backup & CSV Export -->
+        <div class="settings-card">
+          <h3 class="settings-title">Data Backup & Export</h3>
+          <p class="settings-desc">Your data stays completely private on your device. Export anytime for Excel or Sheets.</p>
+          
+          <div class="export-buttons-grid">
+            <button type="button" id="exportCsvBtn" class="action-btn outline-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Export CSV (Spreadsheet)
+            </button>
+            <button type="button" id="exportJsonBtn" class="action-btn outline-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Export JSON Backup
+            </button>
+            
+            <label class="action-btn secondary-btn file-upload-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              Restore from JSON
+              <input type="file" id="importJsonInput" accept=".json" class="hidden-file-input">
+            </label>
+
+            <button type="button" id="resetDataBtn" class="action-btn danger-btn">
+              Reset / Clear Data
+            </button>
+          </div>
+        </div>
+
+        <!-- Android PWA Install Instructions Card -->
+        <div class="settings-card pwa-install-card">
+          <h3 class="settings-title">Install to Android Home Screen</h3>
+          <p class="settings-desc">For the best native app experience with zero browser address bar:</p>
+          <div class="android-steps">
+            <div class="step-row">
+              <span class="step-num">1</span>
+              <span>Open this site in <strong>Google Chrome</strong> on your phone.</span>
+            </div>
+            <div class="step-row">
+              <span class="step-num">2</span>
+              <span>Tap the <strong>three dots menu (⋮)</strong> in Chrome.</span>
+            </div>
+            <div class="step-row">
+              <span class="step-num">3</span>
+              <span>Tap <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.</span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Dock -->
+    <nav class="bottom-dock" aria-label="Bottom Navigation">
+      <button type="button" class="dock-tab active" data-target="view-add" aria-label="Quick Add Expense">
+        <div class="tab-icon-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+        </div>
+        <span class="tab-label">Speed Add</span>
+      </button>
+
+      <button type="button" class="dock-tab" data-target="view-history" aria-label="Transactions History">
+        <div class="tab-icon-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+        </div>
+        <span class="tab-label">History</span>
+      </button>
+
+      <button type="button" class="dock-tab" data-target="view-analytics" aria-label="Budgets & Analytics">
+        <div class="tab-icon-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+        </div>
+        <span class="tab-label">Insights</span>
+      </button>
+
+      <button type="button" class="dock-tab" data-target="view-settings" aria-label="Settings & Sync">
+        <div class="tab-icon-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </div>
+        <span class="tab-label">Settings</span>
+      </button>
+    </nav>
+
+    <!-- Floating Toast Notification System -->
+    <div id="toastNotification" class="toast hidden" role="status" aria-live="polite">
+      <div class="toast-icon" id="toastIcon">✓</div>
+      <div class="toast-body">
+        <div class="toast-title" id="toastTitle">Expense Logged</div>
+        <div class="toast-desc" id="toastDesc">$14.50 for Food & Dining</div>
+      </div>
+    </div>
+
+    <!-- Category Customization Modal -->
+    <div id="categoryModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">Custom Category</h3>
+          <button type="button" id="closeCategoryModalBtn" class="close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="newCategoryName" class="form-label">Category Name</label>
+            <input type="text" id="newCategoryName" class="form-input" placeholder="e.g. Pet Care, Hobbies, Gym" maxlength="24">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Choose Emoji / Icon</label>
+            <div class="emoji-picker-row" id="emojiPickerRow">
+              <button type="button" class="emoji-opt active" data-emoji="🐕">🐕</button>
+              <button type="button" class="emoji-opt" data-emoji="🏋️">🏋️</button>
+              <button type="button" class="emoji-opt" data-emoji="📚">📚</button>
+              <button type="button" class="emoji-opt" data-emoji="🎮">🎮</button>
+              <button type="button" class="emoji-opt" data-emoji="🌱">🌱</button>
+              <button type="button" class="emoji-opt" data-emoji="🎸">🎸</button>
+              <button type="button" class="emoji-opt" data-emoji="🎁">🎁</button>
+              <button type="button" class="emoji-opt" data-emoji="✂️">✂️</button>
+              <button type="button" class="emoji-opt" data-emoji="🚗">🚗</button>
+              <button type="button" class="emoji-opt" data-emoji="💻">💻</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Color Accent</label>
+            <div class="color-picker-row" id="colorPickerRow">
+              <button type="button" class="color-opt active" data-color="#10B981" style="background: #10B981;"></button>
+              <button type="button" class="color-opt" data-color="#3B82F6" style="background: #3B82F6;"></button>
+              <button type="button" class="color-opt" data-color="#8B5CF6" style="background: #8B5CF6;"></button>
+              <button type="button" class="color-opt" data-color="#EC4899" style="background: #EC4899;"></button>
+              <button type="button" class="color-opt" data-color="#F59E0B" style="background: #F59E0B;"></button>
+              <button type="button" class="color-opt" data-color="#06B6D4" style="background: #06B6D4;"></button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="saveCustomCategoryBtn" class="action-btn primary-btn">Add Category</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
