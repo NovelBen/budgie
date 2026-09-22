@@ -737,10 +737,13 @@ html, body {
 .form-row {
   display: flex;
   gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .flex-1 {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .form-label {
@@ -749,6 +752,9 @@ html, body {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .form-input {
@@ -1855,6 +1861,191 @@ input:checked + .slider:before {
   border-radius: 50%;
 }
 
+/* Small Switch Component */
+.switch-small {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.switch-small input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider-small {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.15);
+  transition: .25s;
+  border-radius: 22px;
+}
+
+.slider-small:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .25s;
+  border-radius: 50%;
+}
+
+input:checked + .slider-small {
+  background-color: var(--primary);
+}
+
+input:checked + .slider-small:before {
+  transform: translateX(16px);
+}
+
+/* Recurring Expenses List & Cards */
+.recurring-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.recurring-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  transition: all var(--transition-fast);
+}
+
+.recurring-card.paused {
+  opacity: 0.5;
+}
+
+.rec-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.rec-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rec-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.rec-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.rec-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rec-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge-freq {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+}
+
+.rec-due {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.rec-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.rec-amount {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.rec-amount.income {
+  color: var(--primary-light);
+}
+
+.rec-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rec-btn-small {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.rec-btn-small:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-main);
+}
+
+.rec-btn-small.delete-rec:hover {
+  color: var(--accent-rose);
+  border-color: rgba(244, 63, 94, 0.4);
+}
+
+.recur-toggle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
 .export-buttons-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1994,43 +2185,55 @@ input:checked + .slider:before {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 64px;
-  background: rgba(10, 14, 23, 0.92);
+  height: calc(58px + env(safe-area-inset-bottom, 0px));
+  background: rgba(10, 14, 23, 0.95);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-around;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   z-index: 30;
+  box-sizing: border-box;
 }
 
 .dock-tab {
   flex: 1 1 0px;
   min-width: 0;
   width: 25%;
+  height: 52px;
   background: none;
   border: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   color: var(--text-muted);
   cursor: pointer;
   transition: all var(--transition-fast);
-  padding: 6px 0;
+  padding: 0;
 }
 
 .tab-icon-wrap {
-  transition: transform var(--transition-spring);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.tab-icon-wrap svg {
+  display: block;
 }
 
 .tab-label {
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+  line-height: 1;
 }
 
 .dock-tab.active {
@@ -2038,7 +2241,9 @@ input:checked + .slider:before {
 }
 
 .dock-tab.active .tab-icon-wrap {
-  transform: translateY(-2px) scale(1.1);
+  color: var(--primary-light);
+  filter: drop-shadow(0 0 8px var(--primary-glow));
+  transform: scale(1.05);
 }
 
 /* ==========================================================================
@@ -2131,6 +2336,9 @@ input:checked + .slider:before {
 .modal-card {
   width: 100%;
   max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--bg-card);
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);

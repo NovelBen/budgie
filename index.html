@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="index.css?v=3">
+  <link rel="stylesheet" href="index.css?v=4">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -204,6 +204,34 @@
                     <input type="date" id="expenseDateInput" class="form-input date-input">
                   </div>
                 </div>
+
+                <!-- Recurring Expense Toggle & Options -->
+                <div class="form-group" style="margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border-subtle);">
+                  <div class="recur-toggle-header">
+                    <span class="form-label" style="margin-bottom: 0;">Make Recurring Bill</span>
+                    <label class="switch-small">
+                      <input type="checkbox" id="expenseIsRecurringToggle">
+                      <span class="slider-small round"></span>
+                    </label>
+                  </div>
+                  <div class="recur-options-row hidden" id="recurOptionsRow" style="margin-top: 6px;">
+                    <div class="form-row">
+                      <div class="form-group flex-1">
+                        <label for="recurFrequencySelect" class="form-label">Frequency</label>
+                        <select id="recurFrequencySelect" class="form-input select-input">
+                          <option value="monthly">Monthly</option>
+                          <option value="weekly">Weekly</option>
+                          <option value="biweekly">Bi-weekly (Every 2 wks)</option>
+                          <option value="yearly">Yearly</option>
+                        </select>
+                      </div>
+                      <div class="form-group width-small" id="recurDayGroup">
+                        <label for="recurDayInput" class="form-label">Day of Mo.</label>
+                        <input type="number" id="recurDayInput" class="form-input" min="1" max="31" value="1">
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </details>
 
@@ -295,6 +323,10 @@
               <span class="cashflow-label">Net Balance</span>
               <span class="cashflow-value" id="analyticsNetBalance">$0.00</span>
             </div>
+          </div>
+          <div class="cashflow-sub-row" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-subtle); font-size: 0.8rem; color: var(--text-muted);">
+            <span>Recurring Bills Commitment:</span>
+            <strong id="analyticsRecurringTotal" style="color: var(--text-primary); font-family: var(--font-display);">$0.00/mo</strong>
           </div>
         </div>
 
@@ -451,28 +483,28 @@
           
           <div class="form-row">
             <div class="form-group flex-1">
-              <label for="monthlyIncomeInput" class="form-label">Expected Monthly Income ($)</label>
+              <label for="monthlyIncomeInput" class="form-label">Expected Income ($)</label>
               <input type="number" id="monthlyIncomeInput" class="form-input" min="0" step="100" value="3500">
             </div>
 
             <div class="form-group flex-1">
-              <label for="monthlyBudgetInput" class="form-label">Overall Monthly Budget ($)</label>
+              <label for="monthlyBudgetInput" class="form-label">Monthly Budget ($)</label>
               <input type="number" id="monthlyBudgetInput" class="form-input" min="1" step="50" value="2000">
             </div>
+          </div>
 
-            <div class="form-group width-small">
-              <label for="currencySelect" class="form-label">Currency</label>
-              <select id="currencySelect" class="form-input select-input">
-                <option value="$">$ (USD)</option>
-                <option value="€">€ (EUR)</option>
-                <option value="£">£ (GBP)</option>
-                <option value="CA$">CA$ (CAD)</option>
-                <option value="A$">A$ (AUD)</option>
-                <option value="₹">₹ (INR)</option>
-                <option value="¥">¥ (JPY)</option>
-                <option value="CHF">CHF</option>
-              </select>
-            </div>
+          <div class="form-group" style="margin-top: 10px;">
+            <label for="currencySelect" class="form-label">Currency Symbol</label>
+            <select id="currencySelect" class="form-input select-input">
+              <option value="$">$ (USD)</option>
+              <option value="€">€ (EUR)</option>
+              <option value="£">£ (GBP)</option>
+              <option value="CA$">CA$ (CAD)</option>
+              <option value="A$">A$ (AUD)</option>
+              <option value="₹">₹ (INR)</option>
+              <option value="¥">¥ (JPY)</option>
+              <option value="CHF">CHF</option>
+            </select>
           </div>
 
           <div class="form-group toggle-group">
@@ -501,6 +533,21 @@
           
           <div class="category-limits-editor-list" id="categoryLimitsEditorList">
             <!-- Dynamically populated category rows with limit inputs -->
+          </div>
+        </div>
+
+        <!-- Recurring Expenses & Subscriptions Manager Card -->
+        <div class="settings-card" id="recurringSettingsCard">
+          <div class="section-title-row" style="margin-bottom: 8px;">
+            <div>
+              <h3 class="settings-title">Recurring Bills & Subscriptions</h3>
+              <p class="settings-desc">Auto-adds on schedule (Rent, Netflix, Gym, Paychecks).</p>
+            </div>
+            <button type="button" id="openAddRecurringBtn" class="action-btn secondary-btn" style="padding: 6px 12px; font-size: 0.78rem;">+ Add Rule</button>
+          </div>
+
+          <div class="recurring-list" id="recurringList">
+            <!-- Dynamically populated recurring cards -->
           </div>
         </div>
 
@@ -699,8 +746,76 @@
       </div>
     </div>
 
+    <!-- Recurring Rule Modal -->
+    <div id="recurringModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title" id="recurringModalTitle">Recurring Bill / Income</h3>
+          <button type="button" id="closeRecurringModalBtn" class="close-btn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="newRecurTitle" class="form-label">Bill / Income Name</label>
+            <input type="text" id="newRecurTitle" class="form-input" placeholder="e.g. Rent, Netflix, Gym, Paycheck" maxlength="40">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="newRecurAmount" class="form-label">Amount ($)</label>
+              <input type="number" id="newRecurAmount" class="form-input" placeholder="0.00" min="0.01" step="0.01">
+            </div>
+            <div class="form-group flex-1">
+              <label for="newRecurType" class="form-label">Type</label>
+              <select id="newRecurType" class="form-input select-input">
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="newRecurCategory" class="form-label">Category</label>
+              <select id="newRecurCategory" class="form-input select-input">
+                <!-- Dynamically populated -->
+              </select>
+            </div>
+            <div class="form-group flex-1">
+              <label for="newRecurFrequency" class="form-label">Frequency</label>
+              <select id="newRecurFrequency" class="form-input select-input">
+                <option value="monthly">Monthly</option>
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Bi-weekly (2 wks)</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="newRecurNextDate" class="form-label">Next Due Date</label>
+            <input type="date" id="newRecurNextDate" class="form-input date-input">
+          </div>
+
+          <div class="form-group toggle-group" style="margin-top: 10px;">
+            <div class="toggle-text">
+              <label for="newRecurAutoPost" class="toggle-title">Auto-log when due</label>
+              <span class="toggle-sub">Automatically records transaction and syncs to sheet</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="newRecurAutoPost" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <input type="hidden" id="editingRecurId" value="">
+          <button type="button" id="saveRecurringRuleBtn" class="action-btn primary-btn">Save Recurring Rule</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

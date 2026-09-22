@@ -52,7 +52,8 @@
     TRANSACTIONS: 'budgie_transactions_v3',
     CATEGORIES: 'budgie_categories_v3',
     SETTINGS: 'budgie_settings_v3',
-    SYNC_QUEUE: 'budgie_sync_queue_v3'
+    SYNC_QUEUE: 'budgie_sync_queue_v3',
+    RECURRING: 'budgie_recurring_v3'
   };
 
   const DEFAULT_CATEGORIES = [
@@ -149,6 +150,7 @@
   // ============================================================================
   const state = {
     transactions: [],
+    recurringRules: [],
     categories: [],
     incomeCategories: [...DEFAULT_INCOME_CATEGORIES],
     settings: { ...DEFAULT_SETTINGS },
@@ -272,6 +274,28 @@
     dom.iconPickerRow = document.getElementById('iconPickerRow');
     dom.colorPickerRow = document.getElementById('colorPickerRow');
     dom.saveCustomCategoryBtn = document.getElementById('saveCustomCategoryBtn');
+
+    // Recurring Bill Elements
+    dom.expenseIsRecurringToggle = document.getElementById('expenseIsRecurringToggle');
+    dom.recurOptionsRow = document.getElementById('recurOptionsRow');
+    dom.recurFrequencySelect = document.getElementById('recurFrequencySelect');
+    dom.recurDayInput = document.getElementById('recurDayInput');
+    dom.recurDayGroup = document.getElementById('recurDayGroup');
+    dom.recurringList = document.getElementById('recurringList');
+    dom.openAddRecurringBtn = document.getElementById('openAddRecurringBtn');
+    dom.recurringModal = document.getElementById('recurringModal');
+    dom.recurringModalTitle = document.getElementById('recurringModalTitle');
+    dom.closeRecurringModalBtn = document.getElementById('closeRecurringModalBtn');
+    dom.newRecurTitle = document.getElementById('newRecurTitle');
+    dom.newRecurAmount = document.getElementById('newRecurAmount');
+    dom.newRecurType = document.getElementById('newRecurType');
+    dom.newRecurCategory = document.getElementById('newRecurCategory');
+    dom.newRecurFrequency = document.getElementById('newRecurFrequency');
+    dom.newRecurNextDate = document.getElementById('newRecurNextDate');
+    dom.newRecurAutoPost = document.getElementById('newRecurAutoPost');
+    dom.editingRecurId = document.getElementById('editingRecurId');
+    dom.saveRecurringRuleBtn = document.getElementById('saveRecurringRuleBtn');
+    dom.analyticsRecurringTotal = document.getElementById('analyticsRecurringTotal');
   }
 
   // ============================================================================
@@ -306,15 +330,27 @@
         saveTransactions();
       }
 
+      const storedRec = localStorage.getItem(STORAGE_KEYS.RECURRING);
+      state.recurringRules = storedRec ? JSON.parse(storedRec) : [];
+
       const storedQueue = localStorage.getItem(STORAGE_KEYS.SYNC_QUEUE);
       state.syncQueue = storedQueue ? JSON.parse(storedQueue) : [];
 
     } catch (err) {
       console.error('Budgie: Error loading stored data:', err);
       state.transactions = [];
+      state.recurringRules = [];
       state.categories = [...DEFAULT_CATEGORIES];
       state.settings = { ...DEFAULT_SETTINGS };
       state.syncQueue = [];
+    }
+  }
+
+  function saveRecurringRules() {
+    try {
+      localStorage.setItem(STORAGE_KEYS.RECURRING, JSON.stringify(state.recurringRules));
+    } catch (e) {
+      console.error('Error saving recurring rules:', e);
     }
   }
 
@@ -583,6 +619,34 @@
       isIncome ? 'dollar' : 'check'
     );
 
+    // If recurring toggle was active, create a recurring rule
+    if (dom.expenseIsRecurringToggle && dom.expenseIsRecurringToggle.checked) {
+      const freq = dom.recurFrequencySelect ? dom.recurFrequencySelect.value : 'monthly';
+      const targetDay = dom.recurDayInput ? parseInt(dom.recurDayInput.value, 10) || 1 : 1;
+      const nextDue = getNextOccurrence(date, freq, targetDay);
+
+      const newRule = {
+        id: 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+        title: note || categoryObj.name,
+        amount: parseFloat(amount.toFixed(2)),
+        type: isIncome ? 'income' : 'expense',
+        category: categoryObj.name,
+        categoryId: categoryObj.id,
+        frequency: freq,
+        nextDueDate: nextDue,
+        autoPost: true,
+        active: true,
+        lastPostedDate: date
+      };
+
+      state.recurringRules.push(newRule);
+      saveRecurringRules();
+      renderRecurringList();
+
+      dom.expenseIsRecurringToggle.checked = false;
+      if (dom.recurOptionsRow) dom.recurOptionsRow.classList.add('hidden');
+    }
+
     state.currentAmountStr = '';
     dom.expenseNoteInput.value = '';
     updateAmountDisplay();
@@ -717,6 +781,30 @@
     processSyncQueue();
   }
 
+  function sendDeleteSync(txId) {
+    if (!state.settings.sheetsUrl) return;
+
+    // If this transaction is currently pending in syncQueue, cancel the pending upload
+    const pendingIdx = state.syncQueue.findIndex(item => !item.action && item.id === txId);
+    if (pendingIdx !== -1) {
+      state.syncQueue.splice(pendingIdx, 1);
+      saveSyncQueue();
+      return;
+    }
+
+    const payload = { action: 'delete', id: txId };
+    state.syncQueue.push(payload);
+    saveSyncQueue();
+    processSyncQueue();
+  }
+
+  function sendClearAllSync() {
+    if (!state.settings.sheetsUrl) return;
+    state.syncQueue = [{ action: 'clearAll' }];
+    saveSyncQueue();
+    processSyncQueue();
+  }
+
   let isSyncing = false;
   async function processSyncQueue() {
     if (isSyncing || state.syncQueue.length === 0) return;
@@ -733,29 +821,53 @@
     isSyncing = true;
     updateSyncStatusBadge('syncing');
 
-    const itemsToSync = [...state.syncQueue];
-
     try {
-      await fetch(state.settings.sheetsUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
-        body: JSON.stringify(itemsToSync)
-      });
+      while (state.syncQueue.length > 0 && navigator.onLine) {
+        const nextItem = state.syncQueue[0];
 
-      const syncedIds = new Set(itemsToSync.map(item => item.id));
-      state.syncQueue = state.syncQueue.filter(item => !syncedIds.has(item.id));
-      saveSyncQueue();
+        if (nextItem.action) {
+          // Special action (delete or clearAll)
+          await fetch(state.settings.sheetsUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify(nextItem)
+          });
 
-      state.transactions.forEach(t => {
-        if (syncedIds.has(t.id)) t.synced = true;
-      });
-      saveTransactions();
+          // Action sent successfully
+          state.syncQueue.shift();
+          saveSyncQueue();
+        } else {
+          // Gather consecutive normal transactions to batch send
+          const batch = [];
+          while (state.syncQueue.length > 0 && !state.syncQueue[0].action) {
+            batch.push(state.syncQueue.shift());
+          }
+
+          if (batch.length > 0) {
+            await fetch(state.settings.sheetsUrl, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+              },
+              body: JSON.stringify(batch)
+            });
+
+            const syncedIds = new Set(batch.map(item => item.id));
+            state.transactions.forEach(t => {
+              if (syncedIds.has(t.id)) t.synced = true;
+            });
+            saveTransactions();
+            saveSyncQueue();
+          }
+        }
+      }
 
       updateSyncStatusBadge('online');
-      showToast('Google Sheets Synced', `${itemsToSync.length} entry(s) saved to sheet`, 'cloud');
+      showToast('Google Sheets Synced', 'Changes updated to your sheet', 'cloud');
 
     } catch (err) {
       console.warn('Budgie: Google Sheets sync deferred:', err);
@@ -989,6 +1101,8 @@
     const removed = state.transactions.splice(txIndex, 1)[0];
     saveTransactions();
 
+    sendDeleteSync(removed.id);
+
     showToast('Deleted', `Removed ${removed.type === 'income' ? 'income' : 'expense'} of ${state.settings.currency}${removed.amount.toFixed(2)}`, 'trash');
 
     renderHistoryFeed();
@@ -1034,6 +1148,19 @@
     const netSign = metrics.netBalance >= 0 ? '+' : '-';
     dom.analyticsNetBalance.textContent = `${netSign}${sym}${Math.abs(metrics.netBalance).toFixed(2)}`;
     dom.analyticsNetBalance.style.color = metrics.netBalance >= 0 ? 'var(--primary-light)' : 'var(--accent-rose)';
+
+    // Recurring Bills Commitment calculation
+    let monthlyRecurTotal = 0;
+    (state.recurringRules || []).forEach(r => {
+      if (!r.active || r.type === 'income') return;
+      if (r.frequency === 'weekly') monthlyRecurTotal += (r.amount * 52) / 12;
+      else if (r.frequency === 'biweekly') monthlyRecurTotal += (r.amount * 26) / 12;
+      else if (r.frequency === 'yearly') monthlyRecurTotal += r.amount / 12;
+      else monthlyRecurTotal += r.amount;
+    });
+    if (dom.analyticsRecurringTotal) {
+      dom.analyticsRecurringTotal.textContent = `${sym}${monthlyRecurTotal.toFixed(2)}/mo`;
+    }
 
     // 2. Total Budget Meter
     dom.analyticsSpent.textContent = `${sym}${metrics.spent.toFixed(2)}`;
@@ -1423,6 +1550,378 @@
   }
 
   // ============================================================================
+  // RECURRING BILLS & SUBSCRIPTIONS ENGINE
+  // ============================================================================
+  function getNextOccurrence(fromDateStr, frequency, targetDay = null) {
+    if (!fromDateStr) fromDateStr = new Date().toISOString().split('T')[0];
+    const parts = fromDateStr.split('-').map(Number);
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+
+    if (frequency === 'weekly') {
+      d.setDate(d.getDate() + 7);
+    } else if (frequency === 'biweekly') {
+      d.setDate(d.getDate() + 14);
+    } else if (frequency === 'yearly') {
+      d.setFullYear(d.getFullYear() + 1);
+    } else {
+      // Monthly (default)
+      const nextMonth = d.getMonth() + 1;
+      const desiredDay = targetDay ? Math.min(targetDay, 28) : Math.min(parts[2], 28);
+      d.setMonth(nextMonth, desiredDay);
+      const daysInTargetMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      const actualTarget = targetDay || parts[2];
+      d.setDate(Math.min(actualTarget, daysInTargetMonth));
+    }
+
+    return d.toISOString().split('T')[0];
+  }
+
+  function formatFrequency(freq) {
+    switch (freq) {
+      case 'weekly': return 'Weekly';
+      case 'biweekly': return 'Bi-weekly';
+      case 'yearly': return 'Yearly';
+      case 'monthly':
+      default: return 'Monthly';
+    }
+  }
+
+  function formatDateFriendly(dateStr) {
+    if (!dateStr) return 'N/A';
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (dateStr === todayStr) return 'Today';
+    
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    return d.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function checkAndProcessRecurring() {
+    if (!state.recurringRules || state.recurringRules.length === 0) return 0;
+    const todayStr = new Date().toISOString().split('T')[0];
+    let postedCount = 0;
+
+    state.recurringRules.forEach(rule => {
+      if (!rule.active || !rule.autoPost) return;
+
+      if (!rule.nextDueDate) {
+        rule.nextDueDate = todayStr;
+      }
+
+      let safetyLimit = 0;
+      while (rule.nextDueDate <= todayStr && safetyLimit < 52) {
+        safetyLimit++;
+        const tx = {
+          id: 'tx_rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+          type: rule.type || 'expense',
+          amount: parseFloat(rule.amount.toFixed(2)),
+          category: rule.category,
+          categoryId: rule.categoryId,
+          note: `${rule.title} (Recurring)`,
+          method: 'Auto',
+          date: rule.nextDueDate,
+          dateStr: rule.nextDueDate,
+          timeStr: '00:00:00',
+          createdAt: new Date().toISOString(),
+          synced: false
+        };
+
+        state.transactions.unshift(tx);
+        enqueueForSheetSync(tx);
+
+        rule.lastPostedDate = rule.nextDueDate;
+        rule.nextDueDate = getNextOccurrence(rule.nextDueDate, rule.frequency);
+        postedCount++;
+      }
+    });
+
+    if (postedCount > 0) {
+      saveTransactions();
+      saveRecurringRules();
+      renderGlanceBar();
+      renderHistoryFeed();
+      renderAnalytics();
+      renderRecurringList();
+      showToast('Recurring Logged', `${postedCount} scheduled bill(s) recorded`, 'bills');
+    }
+
+    return postedCount;
+  }
+
+  function renderRecurringList() {
+    if (!dom.recurringList) return;
+
+    if (!state.recurringRules || state.recurringRules.length === 0) {
+      dom.recurringList.innerHTML = `
+        <div class="recurring-empty-state" style="text-align: center; padding: 18px 10px; color: var(--text-muted); font-size: 0.85rem;">
+          <p style="margin-bottom: 4px; font-weight: 500;">No recurring bills or subscriptions added yet.</p>
+          <span style="font-size: 0.76rem; color: var(--text-secondary);">Tap "+ Add Rule" to schedule rent, Netflix, gym, or salary.</span>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+    state.recurringRules.forEach(rule => {
+      const isIncome = rule.type === 'income';
+      const amountPrefix = isIncome ? '+' : '-';
+      const amountClass = isIncome ? 'recurring-amount income' : 'recurring-amount';
+      const cardClass = rule.active ? 'recurring-card' : 'recurring-card paused';
+      const pauseLabel = rule.active ? 'Pause' : 'Resume';
+
+      html += `
+        <div class="${cardClass}" data-rule-id="${rule.id}">
+          <div class="recurring-header">
+            <div class="recurring-title-row">
+              <span class="recurring-title">${escapeHtml(rule.title)}</span>
+              <span class="badge-freq">${escapeHtml(formatFrequency(rule.frequency))}</span>
+            </div>
+            <span class="${amountClass}">${amountPrefix}${state.settings.currency}${rule.amount.toFixed(2)}</span>
+          </div>
+          <div class="recurring-footer">
+            <span class="recurring-due-label">
+              Next: <strong>${formatDateFriendly(rule.nextDueDate)}</strong>
+              ${rule.autoPost ? '<span style="font-size: 0.7rem; color: var(--primary-light); margin-left: 4px;">• Auto-logs</span>' : ''}
+            </span>
+            <div class="recurring-actions">
+              <button type="button" class="rec-btn-small post-now-btn" data-post-id="${rule.id}" title="Post transaction right now">
+                Post Now
+              </button>
+              <button type="button" class="rec-btn-small toggle-active-btn" data-toggle-id="${rule.id}">
+                ${pauseLabel}
+              </button>
+              <button type="button" class="rec-btn-small delete-rule-btn" data-del-id="${rule.id}" title="Delete rule">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    dom.recurringList.innerHTML = html;
+
+    // Attach recurring item action listeners
+    dom.recurringList.querySelectorAll('.post-now-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        triggerHaptic(18);
+        const ruleId = btn.getAttribute('data-post-id');
+        postRecurringRuleNow(ruleId);
+      });
+    });
+
+    dom.recurringList.querySelectorAll('.toggle-active-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        triggerHaptic(14);
+        const ruleId = btn.getAttribute('data-toggle-id');
+        toggleRecurringRuleActive(ruleId);
+      });
+    });
+
+    dom.recurringList.querySelectorAll('.delete-rule-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        triggerHaptic(20);
+        const ruleId = btn.getAttribute('data-del-id');
+        deleteRecurringRule(ruleId);
+      });
+    });
+  }
+
+  function postRecurringRuleNow(ruleId) {
+    const rule = state.recurringRules.find(r => r.id === ruleId);
+    if (!rule) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+
+    const tx = {
+      id: 'tx_rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+      type: rule.type || 'expense',
+      amount: parseFloat(rule.amount.toFixed(2)),
+      category: rule.category,
+      categoryId: rule.categoryId,
+      note: `${rule.title} (Recurring)`,
+      method: 'Auto',
+      date: todayStr,
+      dateStr: todayStr,
+      timeStr: now.toTimeString().split(' ')[0],
+      createdAt: now.toISOString(),
+      synced: false
+    };
+
+    state.transactions.unshift(tx);
+    saveTransactions();
+    enqueueForSheetSync(tx);
+
+    rule.lastPostedDate = todayStr;
+    rule.nextDueDate = getNextOccurrence(todayStr, rule.frequency);
+    saveRecurringRules();
+
+    renderGlanceBar();
+    renderHistoryFeed();
+    renderAnalytics();
+    renderRecurringList();
+
+    showToast('Bill Logged', `Recorded ${rule.title} (${state.settings.currency}${rule.amount.toFixed(2)})`, 'bills');
+  }
+
+  function toggleRecurringRuleActive(ruleId) {
+    const rule = state.recurringRules.find(r => r.id === ruleId);
+    if (!rule) return;
+
+    rule.active = !rule.active;
+    saveRecurringRules();
+    renderRecurringList();
+    renderAnalytics();
+
+    showToast(rule.active ? 'Rule Resumed' : 'Rule Paused', rule.title, 'info');
+  }
+
+  function deleteRecurringRule(ruleId) {
+    const idx = state.recurringRules.findIndex(r => r.id === ruleId);
+    if (idx === -1) return;
+
+    const removed = state.recurringRules.splice(idx, 1)[0];
+    saveRecurringRules();
+    renderRecurringList();
+    renderAnalytics();
+
+    showToast('Rule Deleted', `Removed ${removed.title}`, 'trash');
+  }
+
+  function setupRecurringManager() {
+    const populateCategories = () => {
+      if (!dom.newRecurCategory || !dom.newRecurType) return;
+      const isIncome = dom.newRecurType.value === 'income';
+      const catList = isIncome ? state.incomeCategories : state.categories;
+
+      dom.newRecurCategory.innerHTML = catList.map(c => 
+        `<option value="${c.id}">${escapeHtml(c.name)}</option>`
+      ).join('');
+    };
+
+    const openModal = (ruleToEdit = null) => {
+      triggerHaptic(15);
+      populateCategories();
+
+      if (ruleToEdit) {
+        dom.recurringModalTitle.textContent = 'Edit Recurring Rule';
+        dom.editingRecurId.value = ruleToEdit.id;
+        dom.newRecurTitle.value = ruleToEdit.title;
+        dom.newRecurAmount.value = ruleToEdit.amount;
+        dom.newRecurType.value = ruleToEdit.type || 'expense';
+        populateCategories();
+        dom.newRecurCategory.value = ruleToEdit.categoryId || '';
+        dom.newRecurFrequency.value = ruleToEdit.frequency || 'monthly';
+        dom.newRecurNextDate.value = ruleToEdit.nextDueDate || new Date().toISOString().split('T')[0];
+        dom.newRecurAutoPost.checked = ruleToEdit.autoPost !== false;
+      } else {
+        dom.recurringModalTitle.textContent = 'New Recurring Bill / Income';
+        dom.editingRecurId.value = '';
+        dom.newRecurTitle.value = '';
+        dom.newRecurAmount.value = '';
+        dom.newRecurType.value = 'expense';
+        populateCategories();
+        dom.newRecurFrequency.value = 'monthly';
+        dom.newRecurNextDate.value = new Date().toISOString().split('T')[0];
+        dom.newRecurAutoPost.checked = true;
+      }
+
+      dom.recurringModal.classList.remove('hidden');
+      dom.newRecurTitle.focus();
+    };
+
+    if (dom.openAddRecurringBtn) {
+      dom.openAddRecurringBtn.addEventListener('click', () => openModal());
+    }
+
+    if (dom.closeRecurringModalBtn) {
+      dom.closeRecurringModalBtn.addEventListener('click', () => {
+        dom.recurringModal.classList.add('hidden');
+      });
+    }
+
+    if (dom.newRecurType) {
+      dom.newRecurType.addEventListener('change', populateCategories);
+    }
+
+    if (dom.saveRecurringRuleBtn) {
+      dom.saveRecurringRuleBtn.addEventListener('click', () => {
+        const title = dom.newRecurTitle.value.trim();
+        const amount = parseFloat(dom.newRecurAmount.value);
+        if (!title) {
+          alert('Please enter a bill or income name.');
+          return;
+        }
+        if (isNaN(amount) || amount <= 0) {
+          alert('Please enter a valid amount greater than 0.');
+          return;
+        }
+
+        const type = dom.newRecurType.value;
+        const catList = type === 'income' ? state.incomeCategories : state.categories;
+        const categoryObj = catList.find(c => c.id === dom.newRecurCategory.value) || catList[0];
+        const freq = dom.newRecurFrequency.value;
+        const nextDate = dom.newRecurNextDate.value || new Date().toISOString().split('T')[0];
+        const autoPost = dom.newRecurAutoPost.checked;
+
+        triggerHaptic(20);
+
+        const editId = dom.editingRecurId.value;
+        if (editId) {
+          const rule = state.recurringRules.find(r => r.id === editId);
+          if (rule) {
+            rule.title = title;
+            rule.amount = parseFloat(amount.toFixed(2));
+            rule.type = type;
+            rule.category = categoryObj.name;
+            rule.categoryId = categoryObj.id;
+            rule.frequency = freq;
+            rule.nextDueDate = nextDate;
+            rule.autoPost = autoPost;
+          }
+        } else {
+          const newRule = {
+            id: 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+            title: title,
+            amount: parseFloat(amount.toFixed(2)),
+            type: type,
+            category: categoryObj.name,
+            categoryId: categoryObj.id,
+            frequency: freq,
+            nextDueDate: nextDate,
+            autoPost: autoPost,
+            active: true,
+            lastPostedDate: null
+          };
+          state.recurringRules.push(newRule);
+        }
+
+        saveRecurringRules();
+        renderRecurringList();
+        renderAnalytics();
+        checkAndProcessRecurring();
+
+        dom.recurringModal.classList.add('hidden');
+        showToast('Rule Saved', `${title} (${state.settings.currency}${amount.toFixed(2)} ${formatFrequency(freq)})`, 'bills');
+      });
+    }
+
+    // Handle Speed Add Recurring toggle
+    if (dom.expenseIsRecurringToggle) {
+      dom.expenseIsRecurringToggle.addEventListener('change', () => {
+        triggerHaptic(12);
+        if (dom.expenseIsRecurringToggle.checked) {
+          dom.recurOptionsRow.classList.remove('hidden');
+        } else {
+          dom.recurOptionsRow.classList.add('hidden');
+        }
+      });
+    }
+  }
+
+  // ============================================================================
   // CSV & JSON EXPORT / RESTORE
   // ============================================================================
   function exportToCsv() {
@@ -1467,6 +1966,7 @@
       exportedAt: new Date().toISOString(),
       settings: state.settings,
       categories: state.categories,
+      recurringRules: state.recurringRules,
       transactions: state.transactions
     };
 
@@ -1497,6 +1997,10 @@
           state.transactions = imported.transactions;
           saveTransactions();
         }
+        if (Array.isArray(imported.recurringRules)) {
+          state.recurringRules = imported.recurringRules;
+          saveRecurringRules();
+        }
         if (Array.isArray(imported.categories)) {
           state.categories = imported.categories.map(c => {
             delete c.emoji;
@@ -1516,6 +2020,7 @@
         renderGlanceBar();
         renderHistoryFeed();
         renderAnalytics();
+        renderRecurringList();
         loadSettingsIntoDom();
 
         showToast('Restore Successful', `Imported ${state.transactions.length} transactions`, 'check');
@@ -1608,7 +2113,10 @@
       renderAnalytics();
     } else if (viewId === 'view-add') {
       renderGlanceBar();
+    } else if (viewId === 'view-settings') {
+      renderRecurringList();
     }
+    checkAndProcessRecurring();
   }
 
   // ============================================================================
@@ -1672,9 +2180,8 @@
 
     function clearAllTransactionsAction() {
       state.transactions = [];
-      state.syncQueue = [];
       saveTransactions();
-      saveSyncQueue();
+      sendClearAllSync();
       renderCategoryGrid();
       renderCategoryFilterPills();
       renderGlanceBar();
@@ -1850,6 +2357,9 @@
 
     attachEventListeners();
     setupCategoryModal();
+    setupRecurringManager();
+    renderRecurringList();
+    checkAndProcessRecurring();
     setupVoiceRecognition();
     setupNavigation();
     setupPwa();

@@ -56,12 +56,51 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // Support single expense or batch sync array
-    var items = Array.isArray(data) ? data : [data];
+    // ACTION: Delete a specific transaction by ID
+    if (data.action === "delete" && data.id) {
+      var lastRow = sheet.getLastRow();
+      var deleted = false;
+      if (lastRow > 1) {
+        var idRange = sheet.getRange(2, 8, lastRow - 1, 1).getValues();
+        for (var r = idRange.length - 1; r >= 0; r--) {
+          if (String(idRange[r][0]) === String(data.id)) {
+            sheet.deleteRow(r + 2);
+            deleted = true;
+            break;
+          }
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        action: "delete",
+        deleted: deleted,
+        id: data.id,
+        timestamp: new Date().toISOString()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ACTION: Clear all data rows (preserves header row 1)
+    if (data.action === "clearAll") {
+      var lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        sheet.deleteRows(2, lastRow - 1);
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        action: "clearAll",
+        timestamp: new Date().toISOString()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ACTION: Add transactions (single or batch array)
+    var items = Array.isArray(data) ? data : (data.items ? data.items : [data]);
     var rowsToAdd = [];
 
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
+      // Skip if this is a command object without amount
+      if (item.action && !item.amount) continue;
+
       var dateObj = item.date ? new Date(item.date) : new Date();
       var formattedDate = item.dateStr || Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "yyyy-MM-dd");
       var formattedTime = item.timeStr || Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "HH:mm:ss");
