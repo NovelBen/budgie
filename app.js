@@ -2,6 +2,7 @@
  * ==============================================================================
  * BUDGIE - APPLICATION CORE LOGIC
  * High-performance, offline-first personal budgeting application
+ * Clean Minimalist Aesthetic (Zero Emojis • Pure SVG Vector Icons)
  * ==============================================================================
  */
 
@@ -9,24 +10,57 @@
   'use strict';
 
   // ============================================================================
+  // SVG ICON REGISTRY
+  // ============================================================================
+  const ICONS = {
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+    dining: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>',
+    groceries: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>',
+    coffee: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>',
+    transit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>',
+    shopping: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>',
+    bills: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
+    entertainment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>',
+    health: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>',
+    tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>',
+    star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>',
+    gift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>',
+    book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>',
+    music: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>',
+    activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>',
+    box: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>',
+    globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>',
+    cloud: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
+    mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>',
+    download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>',
+    settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+  };
+
+  function getIconSvg(name) {
+    return ICONS[name] || ICONS.tag;
+  }
+
+  // ============================================================================
   // CONSTANTS & INITIAL DATA
   // ============================================================================
   const STORAGE_KEYS = {
-    TRANSACTIONS: 'budgie_transactions_v1',
-    CATEGORIES: 'budgie_categories_v1',
-    SETTINGS: 'budgie_settings_v1',
-    SYNC_QUEUE: 'budgie_sync_queue_v1'
+    TRANSACTIONS: 'budgie_transactions_v2',
+    CATEGORIES: 'budgie_categories_v2',
+    SETTINGS: 'budgie_settings_v2',
+    SYNC_QUEUE: 'budgie_sync_queue_v2'
   };
 
   const DEFAULT_CATEGORIES = [
-    { id: 'food', name: 'Food & Dining', emoji: '🍔', color: '#10B981' },
-    { id: 'groceries', name: 'Groceries', emoji: '🛒', color: '#84CC16' },
-    { id: 'coffee', name: 'Coffee & Snacks', emoji: '☕', color: '#F59E0B' },
-    { id: 'transit', name: 'Gas & Transit', emoji: '🚗', color: '#3B82F6' },
-    { id: 'shopping', name: 'Shopping', emoji: '🛍️', color: '#8B5CF6' },
-    { id: 'bills', name: 'Bills & Utilities', emoji: '💡', color: '#F43F5E' },
-    { id: 'entertainment', name: 'Entertainment', emoji: '🍿', color: '#EC4899' },
-    { id: 'health', name: 'Health & Wellness', emoji: '💊', color: '#06B6D4' }
+    { id: 'food', name: 'Food & Dining', icon: 'dining', color: '#10B981' },
+    { id: 'groceries', name: 'Groceries', icon: 'groceries', color: '#84CC16' },
+    { id: 'coffee', name: 'Coffee & Snacks', icon: 'coffee', color: '#F59E0B' },
+    { id: 'transit', name: 'Gas & Transit', icon: 'transit', color: '#3B82F6' },
+    { id: 'shopping', name: 'Shopping', icon: 'shopping', color: '#8B5CF6' },
+    { id: 'bills', name: 'Bills & Utilities', icon: 'bills', color: '#F43F5E' },
+    { id: 'entertainment', name: 'Entertainment', icon: 'entertainment', color: '#EC4899' },
+    { id: 'health', name: 'Health & Wellness', icon: 'health', color: '#06B6D4' }
   ];
 
   const DEFAULT_SETTINGS = {
@@ -36,7 +70,7 @@
     haptics: true
   };
 
-  // Sample starter transactions so the user immediately sees the visual beauty
+  // Starter transactions
   const DEMO_TRANSACTIONS = [
     {
       id: 'tx_demo_1',
@@ -105,7 +139,7 @@
     analyticsTimeframe: 'month',
     
     // Custom Category Form State
-    newCategoryEmoji: '🐕',
+    newCategoryIcon: 'tag',
     newCategoryColor: '#10B981',
 
     // PWA Install Prompt
@@ -192,7 +226,7 @@
     dom.categoryModal = document.getElementById('categoryModal');
     dom.closeCategoryModalBtn = document.getElementById('closeCategoryModalBtn');
     dom.newCategoryName = document.getElementById('newCategoryName');
-    dom.emojiPickerRow = document.getElementById('emojiPickerRow');
+    dom.iconPickerRow = document.getElementById('iconPickerRow');
     dom.colorPickerRow = document.getElementById('colorPickerRow');
     dom.saveCustomCategoryBtn = document.getElementById('saveCustomCategoryBtn');
   }
@@ -208,13 +242,22 @@
       }
 
       const storedCategories = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
-      state.categories = storedCategories ? JSON.parse(storedCategories) : [...DEFAULT_CATEGORIES];
+      if (storedCategories) {
+        const parsed = JSON.parse(storedCategories);
+        // Ensure no emojis exist in stored categories
+        state.categories = parsed.map(c => {
+          delete c.emoji;
+          if (!c.icon) c.icon = 'tag';
+          return c;
+        });
+      } else {
+        state.categories = [...DEFAULT_CATEGORIES];
+      }
 
       const storedTx = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
       if (storedTx) {
         state.transactions = JSON.parse(storedTx);
       } else {
-        // First run: seed with demo transactions
         state.transactions = [...DEMO_TRANSACTIONS];
         saveTransactions();
       }
@@ -223,7 +266,7 @@
       state.syncQueue = storedQueue ? JSON.parse(storedQueue) : [];
 
     } catch (err) {
-      console.error('Budgie: Error loading stored data, initializing clean defaults:', err);
+      console.error('Budgie: Error loading stored data:', err);
       state.transactions = [...DEMO_TRANSACTIONS];
       state.categories = [...DEFAULT_CATEGORIES];
       state.settings = { ...DEFAULT_SETTINGS };
@@ -265,7 +308,7 @@
   }
 
   // ============================================================================
-  // HAPTIC FEEDBACK (Tactile Android Vibration)
+  // HAPTIC FEEDBACK (Android Vibration)
   // ============================================================================
   function triggerHaptic(duration = 14) {
     if (!state.settings.haptics) return;
@@ -273,21 +316,21 @@
       try {
         navigator.vibrate(duration);
       } catch (e) {
-        // Silently ignore if blocked by browser policy
+        // Ignored
       }
     }
   }
 
   // ============================================================================
-  // TOAST NOTIFICATIONS
+  // TOAST NOTIFICATIONS (Pure SVG Vector Icons)
   // ============================================================================
   let toastTimer = null;
-  function showToast(title, desc, icon = '✓') {
+  function showToast(title, desc, iconName = 'check') {
     if (!dom.toast) return;
     clearTimeout(toastTimer);
     dom.toastTitle.textContent = title;
     dom.toastDesc.textContent = desc;
-    dom.toastIcon.textContent = icon;
+    dom.toastIcon.innerHTML = getIconSvg(iconName);
     dom.toast.classList.remove('hidden');
 
     toastTimer = setTimeout(() => {
@@ -311,12 +354,10 @@
         str = str === '' ? '0.' : str + '.';
       }
     } else if (/^[0-9]$/.test(key)) {
-      // Prevent more than 2 decimal places
       const dotIndex = str.indexOf('.');
       if (dotIndex !== -1 && str.length - dotIndex > 2) {
         return;
       }
-      // Prevent multiple leading zeroes
       if (str === '0') {
         str = key;
       } else {
@@ -356,9 +397,8 @@
       dom.amountDisplayContainer.classList.add('active-typing');
     }
 
-    // Micro pulse animation
     dom.amountDisplay.classList.remove('pulse-anim');
-    void dom.amountDisplay.offsetWidth; // Force reflow
+    void dom.amountDisplay.offsetWidth;
     dom.amountDisplay.classList.add('pulse-anim');
   }
 
@@ -374,8 +414,8 @@
       chip.setAttribute('aria-checked', cat.id === state.selectedCategoryId);
 
       chip.innerHTML = `
-        <span class="cat-emoji">${cat.emoji}</span>
-        <span class="cat-name">${cat.name}</span>
+        <div class="cat-icon" style="color: ${cat.color};">${getIconSvg(cat.icon || 'tag')}</div>
+        <span class="cat-name">${escapeHtml(cat.name)}</span>
       `;
 
       chip.addEventListener('click', () => {
@@ -421,30 +461,24 @@
       synced: false
     };
 
-    // Prepend to transaction list
     state.transactions.unshift(newTx);
     saveTransactions();
 
-    // Enqueue for Google Sheets sync
     enqueueForSheetSync(newTx);
 
-    // Provide visual & haptic confirmation
     showToast(
-      'Expense Logged!', 
+      'Expense Logged', 
       `${state.settings.currency}${newTx.amount.toFixed(2)} for ${categoryObj.name}`, 
-      categoryObj.emoji
+      'check'
     );
 
-    // Reset Speed Add inputs
     state.currentAmountStr = '';
     dom.expenseNoteInput.value = '';
     updateAmountDisplay();
 
-    // Close optional details accordion if open
     const detailsEl = document.getElementById('optionalDetails');
     if (detailsEl) detailsEl.open = false;
 
-    // Refresh UI metrics
     updateTopMonthHeader();
     renderGlanceBar();
     renderHistoryFeed();
@@ -509,14 +543,12 @@
   }
 
   function parseVoiceExpense(text) {
-    // Regex for amount: "$14.50", "14 dollars", "14.50", "14 bucks"
     let amount = null;
     const amountMatch = text.match(/\$?([0-9]+(?:\.[0-9]{1,2})?)/);
     if (amountMatch) {
       amount = parseFloat(amountMatch[1]);
     }
 
-    // Match Category keywords
     let matchedCat = null;
     const lower = text.toLowerCase();
 
@@ -546,14 +578,14 @@
       state.currentAmountStr = amount.toFixed(2);
       updateAmountDisplay();
       dom.expenseNoteInput.value = text;
-      showToast('Voice Detected', `Heard: "${text}"`, '🎙️');
+      showToast('Voice Detected', `Heard: "${text}"`, 'mic');
     } else {
-      showToast('Voice Entry', `Heard: "${text}" (Amount not recognized)`, '❓');
+      showToast('Voice Entry', `Heard: "${text}" (Amount not recognized)`, 'info');
     }
   }
 
   // ============================================================================
-  // GOOGLE SHEETS SYNC ENGINE (LOCAL-FIRST WITH OFFLINE QUEUE)
+  // GOOGLE SHEETS SYNC ENGINE
   // ============================================================================
   function enqueueForSheetSync(tx) {
     if (!state.settings.sheetsUrl) {
@@ -585,7 +617,6 @@
     const itemsToSync = [...state.syncQueue];
 
     try {
-      // Send payload as simple text/plain to avoid CORS preflight issues with Google Apps Script
       await fetch(state.settings.sheetsUrl, {
         method: 'POST',
         mode: 'no-cors',
@@ -595,23 +626,20 @@
         body: JSON.stringify(itemsToSync)
       });
 
-      // Successful dispatch! In no-cors mode, completion without error indicates transmission
-      // Filter out synced IDs from local queue
       const syncedIds = new Set(itemsToSync.map(item => item.id));
       state.syncQueue = state.syncQueue.filter(item => !syncedIds.has(item.id));
       saveSyncQueue();
 
-      // Mark local items as synced
       state.transactions.forEach(t => {
         if (syncedIds.has(t.id)) t.synced = true;
       });
       saveTransactions();
 
       updateSyncStatusBadge('online');
-      showToast('Google Sheets Synced', `${itemsToSync.length} expense(s) saved to sheet`, '☁️');
+      showToast('Google Sheets Synced', `${itemsToSync.length} expense(s) saved to sheet`, 'cloud');
 
     } catch (err) {
-      console.warn('Budgie: Google Sheets sync deferred (will retry when online):', err);
+      console.warn('Budgie: Google Sheets sync deferred:', err);
       updateSyncStatusBadge('offline');
     } finally {
       isSyncing = false;
@@ -665,7 +693,6 @@
     const remaining = Math.max(0, budget - totalMonthSpent);
     const percentSpent = budget > 0 ? Math.min(100, (totalMonthSpent / budget) * 100) : 0;
 
-    // Days left in current month
     const totalDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const dayOfMonth = now.getDate();
     const daysLeft = Math.max(1, totalDaysInMonth - dayOfMonth + 1);
@@ -717,7 +744,6 @@
     const query = state.historySearchQuery.toLowerCase().trim();
     const filterCat = state.historyCategoryFilter;
 
-    // Filter transactions
     const filtered = state.transactions.filter(tx => {
       const matchCat = filterCat === 'all' || tx.categoryId === filterCat || tx.category === filterCat;
       const matchQuery = !query || 
@@ -727,7 +753,6 @@
       return matchCat && matchQuery;
     });
 
-    // Update history header count & total spent
     const totalFilteredSpend = filtered.reduce((acc, t) => acc + t.amount, 0);
     dom.historyCount.textContent = `${filtered.length} ${filtered.length === 1 ? 'entry' : 'entries'}`;
     dom.historyTotalSpent.textContent = `${state.settings.currency}${totalFilteredSpend.toFixed(2)} spent`;
@@ -740,7 +765,6 @@
 
     dom.historyEmptyState.classList.add('hidden');
 
-    // Group transactions by date
     const groups = {};
     filtered.forEach(tx => {
       const dateKey = tx.date || tx.createdAt.split('T')[0];
@@ -779,7 +803,7 @@
 
       txs.forEach(tx => {
         const catObj = state.categories.find(c => c.id === tx.categoryId || c.name === tx.category) || {
-          emoji: '🪙',
+          icon: 'tag',
           color: '#10B981'
         };
 
@@ -788,8 +812,8 @@
         html += `
           <div class="tx-card" data-tx-id="${tx.id}">
             <div class="tx-left">
-              <div class="tx-icon-bubble" style="border-color: ${catObj.color}33; background: ${catObj.color}15;">
-                ${catObj.emoji}
+              <div class="tx-icon-bubble" style="border-color: ${catObj.color}33; color: ${catObj.color}; background: ${catObj.color}15;">
+                ${getIconSvg(catObj.icon || 'tag')}
               </div>
               <div class="tx-details">
                 <span class="tx-category-name">${escapeHtml(tx.category)}</span>
@@ -803,7 +827,7 @@
             <div class="tx-right">
               <span class="tx-amount">-${state.settings.currency}${tx.amount.toFixed(2)}</span>
               <button type="button" class="tx-delete-btn" data-delete-id="${tx.id}" title="Delete entry" aria-label="Delete entry">
-                ✕
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
               </button>
             </div>
           </div>
@@ -815,7 +839,6 @@
 
     dom.transactionsFeed.innerHTML = html;
 
-    // Attach delete listeners
     dom.transactionsFeed.querySelectorAll('.tx-delete-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -833,7 +856,7 @@
     const removed = state.transactions.splice(txIndex, 1)[0];
     saveTransactions();
 
-    showToast('Deleted', `Removed expense of ${state.settings.currency}${removed.amount.toFixed(2)}`, '🗑️');
+    showToast('Deleted', `Removed expense of ${state.settings.currency}${removed.amount.toFixed(2)}`, 'trash');
 
     renderHistoryFeed();
     renderGlanceBar();
@@ -847,7 +870,8 @@
       const active = state.historyCategoryFilter === cat.id ? 'active' : '';
       html += `
         <button type="button" class="filter-pill ${active}" data-filter="${cat.id}">
-          ${cat.emoji} ${cat.name}
+          ${getIconSvg(cat.icon || 'tag')}
+          <span>${escapeHtml(cat.name)}</span>
         </button>
       `;
     });
@@ -894,7 +918,6 @@
     dom.analyticsDailyPace.textContent = `${sym}${metrics.dailySafeSpend.toFixed(2)} / day`;
     dom.analyticsDaysLeft.textContent = metrics.daysLeft;
 
-    // Render Donut Chart & Category Bars
     renderDonutChart(metrics.categoryTotals, metrics.spent);
     renderCategoryBars(metrics.categoryTotals, metrics.spent);
     renderPaymentBreakdown(metrics.methodTotals);
@@ -919,7 +942,6 @@
     entries.forEach(([catName, amount]) => {
       const percentage = amount / totalSpent;
       const strokeDash = percentage * circumference;
-      const strokeOffset = circumference - strokeDash;
       const rotation = (accumulatedAngle * 360) - 90;
 
       const catObj = state.categories.find(c => c.name === catName) || { color: '#6366F1' };
@@ -949,14 +971,14 @@
 
     let html = '';
     entries.forEach(([catName, amount]) => {
-      const catObj = state.categories.find(c => c.name === catName) || { emoji: '🪙', color: '#10B981' };
+      const catObj = state.categories.find(c => c.name === catName) || { icon: 'tag', color: '#10B981' };
       const percent = totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0;
 
       html += `
         <div class="cat-bar-item">
           <div class="cat-bar-header">
             <span class="cat-bar-label">
-              <span>${catObj.emoji}</span>
+              <span style="color: ${catObj.color}; display: flex; align-items: center;">${getIconSvg(catObj.icon || 'tag')}</span>
               <span>${escapeHtml(catName)}</span>
             </span>
             <span class="cat-bar-amount">${state.settings.currency}${amount.toFixed(2)} (${percent}%)</span>
@@ -997,7 +1019,7 @@
   function exportToCsv() {
     triggerHaptic(15);
     if (state.transactions.length === 0) {
-      showToast('Export CSV', 'No transactions to export yet', 'ℹ️');
+      showToast('Export CSV', 'No transactions to export yet', 'info');
       return;
     }
 
@@ -1025,13 +1047,13 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    showToast('Export Complete', 'Downloaded CSV file', '📊');
+    showToast('Export Complete', 'Downloaded CSV file', 'download');
   }
 
   function exportToJson() {
     triggerHaptic(15);
     const backupData = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       settings: state.settings,
       categories: state.categories,
@@ -1050,7 +1072,7 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    showToast('Export Complete', 'Downloaded JSON backup', '💾');
+    showToast('Export Complete', 'Downloaded JSON backup', 'download');
   }
 
   function restoreFromJson(e) {
@@ -1066,7 +1088,11 @@
           saveTransactions();
         }
         if (Array.isArray(imported.categories)) {
-          state.categories = imported.categories;
+          state.categories = imported.categories.map(c => {
+            delete c.emoji;
+            if (!c.icon) c.icon = 'tag';
+            return c;
+          });
           saveCategories();
         }
         if (imported.settings) {
@@ -1081,7 +1107,7 @@
         renderAnalytics();
         loadSettingsIntoDom();
 
-        showToast('Restore Successful', `Imported ${state.transactions.length} transactions`, '🎉');
+        showToast('Restore Successful', `Imported ${state.transactions.length} transactions`, 'check');
       } catch (err) {
         alert('Invalid JSON backup file: ' + err.message);
       }
@@ -1119,7 +1145,7 @@
     renderAnalytics();
     renderHistoryFeed();
 
-    showToast('Settings Saved', 'Preferences updated successfully', '⚙️');
+    showToast('Settings Saved', 'Preferences updated successfully', 'settings');
   }
 
   function saveGoogleSheetsUrl() {
@@ -1148,7 +1174,6 @@
     showCallout('Testing connection to Google Sheets...', 'success');
 
     try {
-      // Send a test ping
       await fetch(url, {
         method: 'POST',
         mode: 'no-cors',
@@ -1164,7 +1189,7 @@
         })
       });
 
-      showCallout('✓ Connection successful! Your Google Sheet is linked and ready.', 'success');
+      showCallout('Connection successful! Your Google Sheet is linked and ready.', 'success');
       updateSyncStatusBadge('online');
     } catch (err) {
       showCallout('Connection failed: ' + err.message, 'error');
@@ -1192,12 +1217,12 @@
       dom.categoryModal.classList.add('hidden');
     });
 
-    dom.emojiPickerRow.querySelectorAll('.emoji-opt').forEach(btn => {
+    dom.iconPickerRow.querySelectorAll('.icon-opt').forEach(btn => {
       btn.addEventListener('click', () => {
         triggerHaptic(12);
-        dom.emojiPickerRow.querySelectorAll('.emoji-opt').forEach(b => b.classList.remove('active'));
+        dom.iconPickerRow.querySelectorAll('.icon-opt').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        state.newCategoryEmoji = btn.getAttribute('data-emoji');
+        state.newCategoryIcon = btn.getAttribute('data-icon');
       });
     });
 
@@ -1218,8 +1243,8 @@
       const newCat = {
         id: 'cat_' + Date.now(),
         name: name,
-        emoji: state.newCategoryEmoji,
-        color: state.newCategoryColor
+        icon: state.newCategoryIcon || 'tag',
+        color: state.newCategoryColor || '#10B981'
       };
 
       state.categories.push(newCat);
@@ -1232,7 +1257,7 @@
       dom.categoryModal.classList.add('hidden');
       dom.newCategoryName.value = '';
 
-      showToast('Category Added', `Added ${newCat.emoji} ${newCat.name}`, '🎨');
+      showToast('Category Added', `Added ${newCat.name}`, 'tag');
     });
   }
 
@@ -1250,7 +1275,6 @@
       });
     }
 
-    // Capture Android install banner trigger
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       state.deferredInstallPrompt = e;
@@ -1272,7 +1296,7 @@
 
     window.addEventListener('appinstalled', () => {
       dom.installPwaBtn.classList.add('hidden');
-      showToast('Budgie Installed!', 'Ready on your home screen', '📱');
+      showToast('Budgie Installed', 'Ready on your home screen', 'check');
     });
   }
 
@@ -1288,7 +1312,6 @@
       });
     });
 
-    // Check URL parameters for shortcut action e.g. ?action=history
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('action') === 'history') {
       switchView('view-history');
@@ -1314,7 +1337,6 @@
       }
     });
 
-    // Refresh view specific components
     if (viewId === 'view-history') {
       renderHistoryFeed();
     } else if (viewId === 'view-analytics') {
@@ -1328,7 +1350,6 @@
   // EVENT LISTENERS BINDING
   // ============================================================================
   function attachEventListeners() {
-    // Tactile Keypad
     dom.numpad.querySelectorAll('.key-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const key = btn.getAttribute('data-key');
@@ -1336,7 +1357,6 @@
       });
     });
 
-    // Quick Preset Chips (+5, +10, +20, +50)
     document.querySelectorAll('.preset-chip[data-add]').forEach(chip => {
       chip.addEventListener('click', () => {
         const val = parseFloat(chip.getAttribute('data-add'));
@@ -1347,7 +1367,6 @@
     dom.clearAmountBtn.addEventListener('click', clearAmount);
     dom.submitExpenseBtn.addEventListener('click', saveCurrentExpense);
 
-    // Payment method selector
     dom.methodChips.querySelectorAll('.method-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         triggerHaptic(12);
@@ -1357,7 +1376,6 @@
       });
     });
 
-    // History Search
     dom.historySearchInput.addEventListener('input', (e) => {
       state.historySearchQuery = e.target.value;
       if (state.historySearchQuery) {
@@ -1375,7 +1393,6 @@
       renderHistoryFeed();
     });
 
-    // Settings actions
     dom.savePreferencesBtn.addEventListener('click', saveGeneralSettings);
     dom.saveSheetUrlBtn.addEventListener('click', saveGoogleSheetsUrl);
     dom.testSheetConnBtn.addEventListener('click', testGoogleSheetsConnection);
@@ -1401,31 +1418,28 @@
         renderGlanceBar();
         renderHistoryFeed();
         renderAnalytics();
-        showToast('Data Reset', 'Restored to clean demo starter data', '🔄');
+        showToast('Data Reset', 'Restored to clean demo starter data', 'check');
       }
     });
 
-    // Copy Google Apps Script button
     dom.copyAppsScriptBtn.addEventListener('click', async () => {
       triggerHaptic(15);
       try {
         const response = await fetch('./google-sheets-script.js');
         const scriptCode = await response.text();
         await navigator.clipboard.writeText(scriptCode);
-        showToast('Copied to Clipboard!', 'Paste into Extensions > Apps Script in Sheets', '📋');
+        showToast('Copied to Clipboard', 'Paste into Extensions > Apps Script in Sheets', 'check');
       } catch (err) {
-        showToast('Copy Note', 'See google-sheets-script.js in repository', '📋');
+        showToast('Copy Note', 'See google-sheets-script.js in repository', 'info');
       }
     });
 
-    // Sync status badge click: jumps to settings
     dom.syncStatusBadge.addEventListener('click', () => {
       switchView('view-settings');
     });
 
-    // Online/Offline status listeners
     window.addEventListener('online', () => {
-      showToast('Back Online', 'Flushing offline sync queue...', '🌐');
+      showToast('Back Online', 'Flushing offline sync queue...', 'cloud');
       processSyncQueue();
     });
 
@@ -1433,9 +1447,7 @@
       updateSyncStatusBadge('offline');
     });
 
-    // Keyboard support for desktop testing
     window.addEventListener('keydown', (e) => {
-      // Don't intercept if focused in note or input
       if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
         return;
       }
@@ -1469,10 +1481,8 @@
     cacheDomElements();
     loadData();
 
-    // Default Date input to today
     dom.expenseDateInput.value = new Date().toISOString().split('T')[0];
 
-    // Render components
     updateTopMonthHeader();
     renderCategoryGrid();
     renderCategoryFilterPills();
@@ -1481,20 +1491,17 @@
     renderAnalytics();
     loadSettingsIntoDom();
 
-    // Attach modules
     attachEventListeners();
     setupCategoryModal();
     setupVoiceRecognition();
     setupNavigation();
     setupPwa();
 
-    // Process any queued items
     if (state.syncQueue.length > 0 && navigator.onLine && state.settings.sheetsUrl) {
       processSyncQueue();
     }
   }
 
-  // Run when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
