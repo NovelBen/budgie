@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="index.css?v=6">
+  <link rel="stylesheet" href="index.css?v=7">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -452,23 +452,27 @@
             </button>
           </div>
 
+          <button type="button" id="pushSettingsNowBtn" class="action-btn outline-btn" style="width: 100%; margin-top: 8px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            Push Preferences to "Settings" Tab
+          </button>
+
           <div id="sheetsStatusMsg" class="status-callout hidden"></div>
 
           <!-- Expandable Step-by-Step Setup Guide -->
           <details class="setup-guide-accordion">
             <summary class="setup-summary">
-              <span>Step-by-step: How to create your Google Sheet script</span>
+              <span>Step-by-step: How to setup &amp; update Google Sheet script</span>
               <span class="chevron-icon">▾</span>
             </summary>
             <div class="setup-guide-content">
               <ol class="setup-steps">
-                <li>Create a new blank spreadsheet in <a href="https://sheets.new" target="_blank" rel="noopener">Google Sheets</a> called <strong>Budgie Expenses</strong>.</li>
+                <li>Open your spreadsheet in <a href="https://sheets.new" target="_blank" rel="noopener">Google Sheets</a> ("Budgie Expenses").</li>
                 <li>In Google Sheets menu, click <strong>Extensions &rarr; Apps Script</strong>.</li>
-                <li>Delete any default code, click <strong>Copy Script Code</strong> below, and paste it into the editor.</li>
-                <li>Click <strong>Deploy &rarr; New deployment</strong>.</li>
-                <li>Select type: <strong>Web app</strong>. Set Execute as: <strong>Me</strong>. Set Who has access: <strong>Anyone</strong>.</li>
-                <li>Click <strong>Deploy</strong>, grant permissions (click "Advanced" &rarr; "Go to Budgie Sync (unsafe)"), and copy the URL ending in <code>/exec</code>.</li>
-                <li>Paste the URL above!</li>
+                <li>Delete any code, click <strong>Copy Apps Script Code</strong> below, and paste it into the editor.</li>
+                <li>In top right, click <strong>Deploy &rarr; Manage deployments</strong> (or New deployment).</li>
+                <li>Click the <strong>Pencil icon (Edit)</strong> &rarr; under Version select <strong>New version</strong> &rarr; click <strong>Deploy</strong>.</li>
+                <li>Copy the Web App URL ending in <code>/exec</code> and paste it above!</li>
               </ol>
               <button type="button" id="copyAppsScriptBtn" class="action-btn secondary-btn copy-code-btn">
                 Copy Apps Script Code to Clipboard
@@ -518,8 +522,8 @@
             </label>
           </div>
 
-          <button type="button" id="savePreferencesBtn" class="action-btn primary-btn">Save Preferences</button>
-          <p class="field-hint" style="margin-top: 8px; text-align: center;">Auto-saves instantly & syncs to your Google Sheet.</p>
+          <button type="button" id="savePreferencesBtn" class="action-btn primary-btn">Save Preferences Now</button>
+          <div id="settingsSyncStatusText" class="field-hint" style="margin-top: 8px; text-align: center;">Auto-saves on device &amp; syncs to your Google Sheet.</div>
         </div>
 
         <!-- Category Budgets Editor Card -->
@@ -817,6 +821,6 @@
 
   </div>
 
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>

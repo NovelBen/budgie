@@ -249,6 +249,8 @@
     dom.currencySelect = document.getElementById('currencySelect');
     dom.hapticsToggle = document.getElementById('hapticsToggle');
     dom.savePreferencesBtn = document.getElementById('savePreferencesBtn');
+    dom.pushSettingsNowBtn = document.getElementById('pushSettingsNowBtn');
+    dom.settingsSyncStatusText = document.getElementById('settingsSyncStatusText');
     dom.openAddCategoryFromSettingsBtn = document.getElementById('openAddCategoryFromSettingsBtn');
     dom.categoryLimitsEditorList = document.getElementById('categoryLimitsEditorList');
     dom.exportCsvBtn = document.getElementById('exportCsvBtn');
@@ -771,6 +773,7 @@
   // ============================================================================
   // GOOGLE SHEETS SYNC ENGINE
   // ============================================================================
+  let syncQueueDebounceTimer = null;
   function enqueueForSheetSync(tx) {
     if (!state.settings.sheetsUrl) {
       updateSyncStatusBadge('local');
@@ -779,7 +782,96 @@
 
     state.syncQueue.push(tx);
     saveSyncQueue();
-    processSyncQueue();
+    updatePendingBadge();
+
+    // 4-second buffer: allows user to delete/undo an accidental entry before it uploads to Google Sheets
+    if (syncQueueDebounceTimer) {
+      clearTimeout(syncQueueDebounceTimer);
+    }
+    syncQueueDebounceTimer = setTimeout(() => {
+      syncQueueDebounceTimer = null;
+      processSyncQueue();
+    }, 4000);
+  }
+
+  let settingsSyncDebounceTimer = null;
+  let settingsCountdownInterval = null;
+
+  function updateSettingsSyncStatusUI(remainingSeconds) {
+    if (!dom.settingsSyncStatusText) return;
+    if (!state.settings.sheetsUrl) {
+      dom.settingsSyncStatusText.innerHTML = 'Saved on device (Google Sheets sync not linked).';
+      dom.settingsSyncStatusText.style.color = 'var(--text-muted)';
+      return;
+    }
+
+    if (remainingSeconds > 0) {
+      dom.settingsSyncStatusText.innerHTML = `Saved locally. Syncing to Google Sheet in <strong style="color:var(--primary-light);">${remainingSeconds}s</strong>... <button type="button" id="syncNowInlineBtn" style="background:none; border:none; color:var(--primary-light); text-decoration:underline; cursor:pointer; font-size:0.75rem; padding:0; margin-left:4px;">Sync Now</button>`;
+      const inlineBtn = document.getElementById('syncNowInlineBtn');
+      if (inlineBtn) {
+        inlineBtn.onclick = (e) => {
+          e.preventDefault();
+          flushPendingSettingsSync();
+        };
+      }
+    } else {
+      dom.settingsSyncStatusText.innerHTML = `✓ Auto-saved on device &amp; synced to Google Sheet (Settings tab)`;
+      dom.settingsSyncStatusText.style.color = 'var(--text-secondary)';
+    }
+  }
+
+  function scheduleSettingsPushToSheets(delaySeconds = 30) {
+    if (!state.settings.sheetsUrl) {
+      updateSettingsSyncStatusUI(0);
+      return;
+    }
+
+    if (settingsSyncDebounceTimer) {
+      clearTimeout(settingsSyncDebounceTimer);
+      settingsSyncDebounceTimer = null;
+    }
+    if (settingsCountdownInterval) {
+      clearInterval(settingsCountdownInterval);
+      settingsCountdownInterval = null;
+    }
+
+    let remaining = delaySeconds;
+    updateSettingsSyncStatusUI(remaining);
+
+    settingsCountdownInterval = setInterval(() => {
+      remaining--;
+      if (remaining > 0) {
+        updateSettingsSyncStatusUI(remaining);
+      } else {
+        clearInterval(settingsCountdownInterval);
+        settingsCountdownInterval = null;
+      }
+    }, 1000);
+
+    settingsSyncDebounceTimer = setTimeout(() => {
+      settingsSyncDebounceTimer = null;
+      if (settingsCountdownInterval) {
+        clearInterval(settingsCountdownInterval);
+        settingsCountdownInterval = null;
+      }
+      pushSettingsToSheets();
+      updateSettingsSyncStatusUI(0);
+    }, delaySeconds * 1000);
+  }
+
+  function flushPendingSettingsSync() {
+    if (settingsSyncDebounceTimer) {
+      clearTimeout(settingsSyncDebounceTimer);
+      settingsSyncDebounceTimer = null;
+    }
+    if (settingsCountdownInterval) {
+      clearInterval(settingsCountdownInterval);
+      settingsCountdownInterval = null;
+    }
+    if (state.settings.sheetsUrl) {
+      pushSettingsToSheets();
+    }
+    updateSettingsSyncStatusUI(0);
   }
 
   function pushSettingsToSheets() {
@@ -807,6 +899,7 @@
     state.syncQueue = state.syncQueue.filter(item => item.action !== 'saveSettings');
     state.syncQueue.push(payload);
     saveSyncQueue();
+    updatePendingBadge();
     processSyncQueue();
   }
 
@@ -1466,7 +1559,7 @@
           targetCat.budgetLimit = newLimit;
           saveCategories();
           renderCategoryBudgetMeters(getMonthSpendMetrics().categoryTotals);
-          pushSettingsToSheets();
+          scheduleSettingsPushToSheets(30);
           showToast('Limit Updated', `${targetCat.name} limit set to ${sym}${newLimit}`, 'check');
         }
       });
@@ -1484,9 +1577,10 @@
     renderCategoryLimitsEditor();
     updatePendingBadge();
     updateSyncStatusBadge(state.settings.sheetsUrl ? 'online' : 'local');
+    updateSettingsSyncStatusUI(0);
   }
 
-  function saveGeneralSettings(showNotification = true) {
+  function saveGeneralSettings(showNotification = true, syncDelaySeconds = 30) {
     if (showNotification) triggerHaptic(15);
     const incomeVal = parseFloat(dom.monthlyIncomeInput.value);
     if (!isNaN(incomeVal) && incomeVal >= 0) {
@@ -1503,14 +1597,19 @@
     dom.currencySymbol.textContent = state.entryMode === 'income' ? '+' + state.settings.currency : state.settings.currency;
 
     saveSettings();
-    pushSettingsToSheets();
     renderGlanceBar();
     renderAnalytics();
     renderHistoryFeed();
     renderCategoryLimitsEditor();
 
+    if (syncDelaySeconds > 0) {
+      scheduleSettingsPushToSheets(syncDelaySeconds);
+    } else {
+      flushPendingSettingsSync();
+    }
+
     if (showNotification) {
-      showToast('Settings Saved', 'Preferences saved & synced to sheet', 'settings');
+      showToast('Settings Saved', 'Preferences saved locally & syncing to sheet', 'settings');
     }
   }
 
@@ -1545,21 +1644,15 @@
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
-          id: 'test_ping',
-          type: 'system',
-          amount: 0,
-          category: 'Budgie Setup',
-          note: 'Connection Test Ping',
-          method: 'System',
-          date: new Date().toISOString().split('T')[0],
-          createdAt: new Date().toISOString()
+          action: 'ping',
+          timestamp: new Date().toISOString()
         })
       });
 
-      pushSettingsToSheets();
-      showCallout('Connection successful! Google Sheet linked & budget preferences synced.', 'success');
+      // Immediately push settings to create the "Settings" tab in their sheet!
+      flushPendingSettingsSync();
+      showCallout('Connection successful! Google Sheet linked & "Settings" tab created.', 'success');
       updateSyncStatusBadge('online');
-      pullSettingsFromSheets(false);
     } catch (err) {
       showCallout('Connection failed: ' + err.message, 'error');
       updateSyncStatusBadge('error');
@@ -2220,6 +2313,9 @@
     }
     checkAndProcessRecurring();
 
+    // Flush any pending settings sync when switching tabs
+    flushPendingSettingsSync();
+
     // Reset view scroll position to top
     const mainContent = document.querySelector('.main-content');
     if (mainContent) {
@@ -2274,21 +2370,34 @@
       renderHistoryFeed();
     });
 
-    dom.savePreferencesBtn.addEventListener('click', () => saveGeneralSettings(true));
+    dom.savePreferencesBtn.addEventListener('click', () => saveGeneralSettings(true, 0));
 
-    // Auto-save settings on input and change
+    if (dom.pushSettingsNowBtn) {
+      dom.pushSettingsNowBtn.addEventListener('click', () => {
+        triggerHaptic(15);
+        flushPendingSettingsSync();
+        showCallout('Syncing budget preferences to Google Sheet...', 'success');
+        showToast('Settings Synced', 'Budget & preferences pushed to Google Sheet', 'cloud');
+      });
+    }
+
+    // Auto-save settings locally after 300ms, debounce Google Sheets sync by 30 seconds
     let autoSaveTimer = null;
     const triggerAutoSave = () => {
       clearTimeout(autoSaveTimer);
       autoSaveTimer = setTimeout(() => {
-        saveGeneralSettings(false);
-      }, 350);
+        saveGeneralSettings(false, 30);
+      }, 300);
     };
 
     dom.monthlyIncomeInput.addEventListener('input', triggerAutoSave);
     dom.monthlyBudgetInput.addEventListener('input', triggerAutoSave);
-    dom.currencySelect.addEventListener('change', () => saveGeneralSettings(false));
-    dom.hapticsToggle.addEventListener('change', () => saveGeneralSettings(false));
+    dom.currencySelect.addEventListener('change', () => saveGeneralSettings(false, 30));
+    dom.hapticsToggle.addEventListener('change', () => saveGeneralSettings(false, 30));
+
+    window.addEventListener('beforeunload', () => {
+      flushPendingSettingsSync();
+    });
     dom.saveSheetUrlBtn.addEventListener('click', saveGoogleSheetsUrl);
     dom.testSheetConnBtn.addEventListener('click', testGoogleSheetsConnection);
     dom.syncPendingBtn.addEventListener('click', () => {

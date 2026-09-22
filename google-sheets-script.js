@@ -4,30 +4,70 @@
  * Two-way sync for transactions, delete/clear actions, and budget preferences
  * ==============================================================================
  * 
- * SETUP INSTRUCTIONS (Takes ~2 minutes):
- * 1. Open Google Sheets (create a new blank spreadsheet called "Budgie Expenses").
+ * SETUP / UPDATE INSTRUCTIONS:
+ * 1. Open your Google Spreadsheet ("Budgie Expenses").
  * 2. In the top menu, click Extensions > Apps Script.
- * 3. Delete any code in the editor, paste this entire script, and click the Save icon.
- * 4. In the top right, click "Deploy" > "Manage deployments" (or "New deployment").
- * 5. Under "Select type" (gear icon), select "Web app".
- * 6. Set Description: "Budgie Sync".
- * 7. Set "Execute as": "Me (your email)".
- * 8. Set "Who has access": "Anyone" (this lets your phone send data without complex OAuth).
- * 9. Click "Deploy". Grant permissions if prompted (click "Advanced" > "Go to Budgie Sync (unsafe)").
- * 10. Copy the Web App URL (ends in /exec).
- * 11. Open Budgie > Settings > Paste your URL into the Google Sheets Sync URL box!
+ * 3. Replace all code in the editor with this script and click the Save icon (Ctrl+S).
+ * 
+ * 4. IMPORTANT - CREATE OR UPDATE DEPLOYMENT:
+ *    - If FIRST TIME: Click "Deploy" > "New deployment" > Select type "Web app" >
+ *      Execute as: "Me" > Who has access: "Anyone" > Click "Deploy".
+ *    - If UPDATING: Click "Deploy" > "Manage deployments" > Click the Pencil icon (Edit) >
+ *      Under "Version", select "New version" > Click "Deploy".
+ *    (Note: In Google Apps Script, editing code without selecting "New version"
+ *     will continue running the old version!)
+ * 
+ * 5. Copy the Web App URL (ends in /exec) and paste it into Budgie Settings.
  * ==============================================================================
  */
 
 function getTransactionsSheet(ss) {
-  var sheet = ss.getSheetByName("Transactions") || ss.getSheetByName("Expenses") || ss.getSheetByName("Budgie Expenses");
+  var sheet = ss.getSheetByName("Transactions") || ss.getSheetByName("Expenses") || ss.getSheetByName("Budgie Expenses") || ss.getSheetByName("Sheet1");
   if (!sheet) {
-    sheet = ss.getSheets()[0];
-    try {
-      sheet.setName("Transactions");
-    } catch (e) {}
+    var sheets = ss.getSheets();
+    for (var i = 0; i < sheets.length; i++) {
+      if (sheets[i].getName() !== "Settings") {
+        sheet = sheets[i];
+        break;
+      }
+    }
+    if (!sheet) {
+      sheet = ss.insertSheet("Transactions");
+    } else {
+      try {
+        sheet.setName("Transactions");
+      } catch (e) {}
+    }
   }
   return sheet;
+}
+
+/**
+ * Removes any connection test pings, "Budgie Setup", or $0 dummy rows
+ * that were logged in the Transactions sheet.
+ */
+function cleanupGarbageRows(sheet) {
+  try {
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return;
+    var values = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
+    for (var r = values.length - 1; r >= 0; r--) {
+      var type = String(values[r][0] || "").toLowerCase();
+      var amount = parseFloat(values[r][3] || 0);
+      var category = String(values[r][4] || "");
+      var note = String(values[r][5] || "");
+      var txId = String(values[r][7] || "");
+
+      var isTest = (txId === "test_ping" || category === "Budgie Setup" || note === "Connection Test Ping" || type === "system");
+      var isSettingsGarbage = (amount === 0 && (category === "General" || category === "") && (note === "" || note === "undefined"));
+
+      if (isTest || isSettingsGarbage) {
+        sheet.deleteRow(r + 2);
+      }
+    }
+  } catch (err) {
+    Logger.log("cleanupGarbageRows error: " + err);
+  }
 }
 
 function doPost(e) {
@@ -35,7 +75,7 @@ function doPost(e) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = getTransactionsSheet(ss);
     
-    // Auto-create beautiful headers if sheet is empty
+    // Auto-create headers if Transactions sheet is empty
     if (sheet.getLastRow() === 0) {
       var headers = [
         "Type",
@@ -50,7 +90,6 @@ function doPost(e) {
       ];
       sheet.appendRow(headers);
       
-      // Style headers: bold, dark slate background, white text
       var headerRange = sheet.getRange(1, 1, 1, headers.length);
       headerRange.setFontWeight("bold");
       headerRange.setBackground("#0F172A");
@@ -69,8 +108,20 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // ACTION: Save Settings & Budget Preferences
+    // ACTION: Connection Test Ping (never logs an expense)
+    if (data.action === "ping" || data.action === "test") {
+      cleanupGarbageRows(sheet);
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        action: "ping",
+        message: "Budgie connected successfully! No expense rows created.",
+        timestamp: new Date().toISOString()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ACTION: Save Settings & Budget Preferences to dedicated "Settings" sheet
     if (data.action === "saveSettings") {
+      cleanupGarbageRows(sheet);
       PropertiesService.getScriptProperties().setProperty('budgie_settings', JSON.stringify(data));
 
       var settingsSheet = ss.getSheetByName("Settings");
@@ -80,23 +131,23 @@ function doPost(e) {
       settingsSheet.clear();
 
       var setRows = [
-        ["Setting", "Value", "Notes"],
-        ["Expected Monthly Income", parseFloat(data.settings && data.settings.expectedIncome || 3500), "Monthly baseline income"],
-        ["Overall Monthly Budget", parseFloat(data.settings && data.settings.monthlyBudget || 2000), "Monthly spending limit"],
-        ["Currency Symbol", String(data.settings && data.settings.currency || "$"), "Display currency"],
-        ["Haptic Feedback", String(data.settings && data.settings.haptics !== false), "Vibration preference"],
-        ["Last Updated", Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"), "Auto-synced from Budgie"],
-        ["", "", ""],
-        ["Category", "Monthly Budget Limit ($)", ""]
+        ["Setting", "Value", "Notes", ""],
+        ["Expected Monthly Income", parseFloat(data.settings && data.settings.expectedIncome || 3500), "Monthly baseline income", ""],
+        ["Overall Monthly Budget", parseFloat(data.settings && data.settings.monthlyBudget || 2000), "Monthly spending limit", ""],
+        ["Currency Symbol", String(data.settings && data.settings.currency || "$"), "Display currency", ""],
+        ["Haptic Feedback", String(data.settings && data.settings.haptics !== false), "Vibration preference", ""],
+        ["Last Updated", Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"), "Auto-synced from Budgie", ""],
+        ["", "", "", ""],
+        ["Category", "Monthly Budget Limit ($)", "Status", ""]
       ];
 
       var cats = data.categories || [];
       for (var c = 0; c < cats.length; c++) {
-        setRows.push([cats[c].name || "", parseFloat(cats[c].budgetLimit || 0), ""]);
+        setRows.push([cats[c].name || "", parseFloat(cats[c].budgetLimit || 0), "Active", ""]);
       }
 
       if (data.recurringRules && data.recurringRules.length > 0) {
-        setRows.push(["", "", ""]);
+        setRows.push(["", "", "", ""]);
         setRows.push(["Recurring Bill", "Amount ($)", "Frequency", "Next Due"]);
         for (var r = 0; r < data.recurringRules.length; r++) {
           var rec = data.recurringRules[r];
@@ -104,28 +155,31 @@ function doPost(e) {
         }
       }
 
-      var maxCols = 3;
-      for (var m = 0; m < setRows.length; m++) {
-        if (setRows[m].length > maxCols) maxCols = setRows[m].length;
-      }
-      for (var n = 0; n < setRows.length; n++) {
-        while (setRows[n].length < maxCols) setRows[n].push("");
-      }
-
+      var maxCols = 4;
       settingsSheet.getRange(1, 1, setRows.length, maxCols).setValues(setRows);
 
-      // Style header
+      // Format header
       var setHeaderRange = settingsSheet.getRange(1, 1, 1, maxCols);
       setHeaderRange.setFontWeight("bold");
       setHeaderRange.setBackground("#0F172A");
       setHeaderRange.setFontColor("#F8FAFC");
       settingsSheet.setColumnWidth(1, 220);
       settingsSheet.setColumnWidth(2, 160);
-      settingsSheet.setColumnWidth(3, 220);
+      settingsSheet.setColumnWidth(3, 160);
+      settingsSheet.setColumnWidth(4, 200);
+
+      // Format currency amounts in Column B
+      for (var rowIdx = 2; rowIdx <= setRows.length; rowIdx++) {
+        var cellVal = setRows[rowIdx - 1][1];
+        if (typeof cellVal === "number" && cellVal > 0) {
+          settingsSheet.getRange(rowIdx, 2).setNumberFormat("$#,##0.00");
+        }
+      }
 
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
         action: "saveSettings",
+        tab: "Settings",
         timestamp: new Date().toISOString()
       })).setMimeType(ContentService.MimeType.JSON);
     }
@@ -178,14 +232,26 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // STRICT GUARD: Unrecognized actions must NEVER fall through to become transactions
+    if (data.action && data.action !== "add") {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "ignored",
+        action: data.action,
+        message: "Unrecognized action ignored without adding rows"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // ACTION: Add transactions (single or batch array)
     var items = Array.isArray(data) ? data : (data.items ? data.items : [data]);
     var rowsToAdd = [];
 
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
-      // Skip if this is a command object without amount
-      if (item.action && !item.amount) continue;
+      if (!item) continue;
+      // Skip commands or test pings
+      if (item.action && item.action !== "add") continue;
+      if (item.id === "test_ping" || item.category === "Budgie Setup" || item.note === "Connection Test Ping") continue;
+      if (parseFloat(item.amount || 0) === 0 && (!item.note || item.note === "undefined") && (item.category === "General" || !item.category)) continue;
 
       var dateObj = item.date ? new Date(item.date) : new Date();
       var formattedDate = item.dateStr || Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "yyyy-MM-dd");
@@ -229,12 +295,52 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
   var stored = PropertiesService.getScriptProperties().getProperty('budgie_settings');
   var settingsData = stored ? JSON.parse(stored) : null;
   return ContentService.createTextOutput(JSON.stringify({
     status: "online",
     service: "Budgie Google Sheets Sync Webhook",
+    version: "v6",
+    hasSettingsTab: Boolean(ss.getSheetByName("Settings")),
     settings: settingsData,
     timestamp: new Date().toISOString()
   })).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * MANUAL HELPER: Run this function directly inside Apps Script toolbar
+ * by selecting "setupBudgieSheets" and clicking Run.
+ * It immediately sets up the "Transactions" and "Settings" tabs and cleans up test rows!
+ */
+function setupBudgieSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = getTransactionsSheet(ss);
+  cleanupGarbageRows(sheet);
+
+  var settingsSheet = ss.getSheetByName("Settings");
+  if (!settingsSheet) {
+    settingsSheet = ss.insertSheet("Settings");
+    var defaultRows = [
+      ["Setting", "Value", "Notes", ""],
+      ["Expected Monthly Income", 3500, "Monthly baseline income", ""],
+      ["Overall Monthly Budget", 2000, "Monthly spending limit", ""],
+      ["Currency Symbol", "$", "Display currency", ""],
+      ["Haptic Feedback", "true", "Vibration preference", ""],
+      ["Last Updated", Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"), "Initial Setup", ""]
+    ];
+    settingsSheet.getRange(1, 1, defaultRows.length, 4).setValues(defaultRows);
+    var hdr = settingsSheet.getRange(1, 1, 1, 4);
+    hdr.setFontWeight("bold");
+    hdr.setBackground("#0F172A");
+    hdr.setFontColor("#F8FAFC");
+    settingsSheet.setColumnWidth(1, 220);
+    settingsSheet.setColumnWidth(2, 160);
+    settingsSheet.setColumnWidth(3, 160);
+    settingsSheet.setColumnWidth(4, 200);
+  }
+
+  Logger.log("Transactions Sheet: " + sheet.getName());
+  Logger.log("Settings Sheet: " + settingsSheet.getName());
+  Logger.log("Setup completed successfully!");
 }
