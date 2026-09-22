@@ -294,6 +294,7 @@
     dom.newRecurCategory = document.getElementById('newRecurCategory');
     dom.newRecurFrequency = document.getElementById('newRecurFrequency');
     dom.newRecurNextDate = document.getElementById('newRecurNextDate');
+    dom.recurFrequencyHint = document.getElementById('recurFrequencyHint');
     dom.newRecurAutoPost = document.getElementById('newRecurAutoPost');
     dom.editingRecurId = document.getElementById('editingRecurId');
     dom.saveRecurringRuleBtn = document.getElementById('saveRecurringRuleBtn');
@@ -1442,6 +1443,7 @@
       if (!r.active || r.type === 'income') return;
       if (r.frequency === 'weekly') monthlyRecurTotal += (r.amount * 52) / 12;
       else if (r.frequency === 'biweekly') monthlyRecurTotal += (r.amount * 26) / 12;
+      else if (r.frequency === 'semimonthly') monthlyRecurTotal += r.amount * 2;
       else if (r.frequency === 'yearly') monthlyRecurTotal += r.amount / 12;
       else monthlyRecurTotal += r.amount;
     });
@@ -1756,6 +1758,7 @@
       let monthlyEquiv = r.amount;
       if (r.frequency === 'weekly') monthlyEquiv = (r.amount * 52) / 12;
       else if (r.frequency === 'biweekly') monthlyEquiv = (r.amount * 26) / 12;
+      else if (r.frequency === 'semimonthly') monthlyEquiv = r.amount * 2;
       else if (r.frequency === 'yearly') monthlyEquiv = r.amount / 12;
 
       if (r.type === 'income') {
@@ -2177,7 +2180,16 @@
     if (frequency === 'weekly') {
       d.setDate(d.getDate() + 7);
     } else if (frequency === 'biweekly') {
+      // Exactly 14 days later (alternating every 2 weeks)
       d.setDate(d.getDate() + 14);
+    } else if (frequency === 'semimonthly') {
+      // Twice a month: 1st and 15th
+      const curDay = d.getDate();
+      if (curDay < 15) {
+        d.setDate(15);
+      } else {
+        d.setMonth(d.getMonth() + 1, 1);
+      }
     } else if (frequency === 'yearly') {
       d.setFullYear(d.getFullYear() + 1);
     } else {
@@ -2196,7 +2208,8 @@
   function formatFrequency(freq) {
     switch (freq) {
       case 'weekly': return 'Weekly';
-      case 'biweekly': return 'Bi-weekly';
+      case 'biweekly': return 'Every 2 Weeks';
+      case 'semimonthly': return 'Twice a Month (1st & 15th)';
       case 'yearly': return 'Yearly';
       case 'monthly':
       default: return 'Monthly';
@@ -2435,6 +2448,7 @@
         dom.newRecurFrequency.value = ruleToEdit.frequency || 'monthly';
         dom.newRecurNextDate.value = ruleToEdit.nextDueDate || new Date().toISOString().split('T')[0];
         dom.newRecurAutoPost.checked = ruleToEdit.autoPost !== false;
+        updateFrequencyHint();
       } else {
         dom.recurringModalTitle.textContent = 'New Recurring Bill / Income';
         dom.editingRecurId.value = '';
@@ -2445,11 +2459,32 @@
         dom.newRecurFrequency.value = 'monthly';
         dom.newRecurNextDate.value = new Date().toISOString().split('T')[0];
         dom.newRecurAutoPost.checked = true;
+        updateFrequencyHint();
       }
 
       dom.recurringModal.classList.remove('hidden');
       dom.newRecurTitle.focus();
     };
+
+    function updateFrequencyHint() {
+      if (!dom.recurFrequencyHint) return;
+      const freq = dom.newRecurFrequency ? dom.newRecurFrequency.value : 'monthly';
+      if (freq === 'biweekly') {
+        dom.recurFrequencyHint.innerHTML = '<strong style="color:var(--primary-light);">⚡ Every 2 Weeks:</strong> Recurs every 14 days from your start date (perfect for bi-weekly paychecks &amp; alternating weeks).';
+      } else if (freq === 'semimonthly') {
+        dom.recurFrequencyHint.innerHTML = '<strong style="color:var(--accent-cyan);">📅 Twice a Month:</strong> Automatically recurs on the 1st and 15th of each month (24 times/year).';
+      } else if (freq === 'weekly') {
+        dom.recurFrequencyHint.innerHTML = '<strong style="color:var(--text-secondary);">📆 Weekly:</strong> Recurs every 7 days from your start date.';
+      } else if (freq === 'yearly') {
+        dom.recurFrequencyHint.innerHTML = '<strong style="color:var(--text-secondary);">🎂 Yearly:</strong> Recurs once per year on the same date.';
+      } else {
+        dom.recurFrequencyHint.innerHTML = '<strong style="color:var(--text-muted);">🗓️ Monthly:</strong> Recurs once per month on this day.';
+      }
+    }
+
+    if (dom.newRecurFrequency) {
+      dom.newRecurFrequency.addEventListener('change', updateFrequencyHint);
+    }
 
     if (dom.openAddRecurringBtn) {
       dom.openAddRecurringBtn.addEventListener('click', () => openModal());
@@ -2528,7 +2563,7 @@
       });
     }
 
-    // Handle Speed Add Recurring toggle
+    // Handle Speed Add Recurring toggle and frequency change
     if (dom.expenseIsRecurringToggle) {
       dom.expenseIsRecurringToggle.addEventListener('change', () => {
         triggerHaptic(12);
@@ -2536,6 +2571,18 @@
           dom.recurOptionsRow.classList.remove('hidden');
         } else {
           dom.recurOptionsRow.classList.add('hidden');
+        }
+      });
+    }
+
+    if (dom.recurFrequencySelect) {
+      dom.recurFrequencySelect.addEventListener('change', () => {
+        if (dom.recurDayGroup) {
+          if (dom.recurFrequencySelect.value === 'monthly') {
+            dom.recurDayGroup.style.display = 'block';
+          } else {
+            dom.recurDayGroup.style.display = 'none';
+          }
         }
       });
     }
