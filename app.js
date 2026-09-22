@@ -298,6 +298,33 @@
     dom.editingRecurId = document.getElementById('editingRecurId');
     dom.saveRecurringRuleBtn = document.getElementById('saveRecurringRuleBtn');
     dom.analyticsRecurringTotal = document.getElementById('analyticsRecurringTotal');
+
+    // History Sub-Tabs
+    dom.subtabTransactions = document.getElementById('subtabTransactions');
+    dom.subtabRecurring = document.getElementById('subtabRecurring');
+    dom.historySubviewTransactions = document.getElementById('historySubviewTransactions');
+    dom.historySubviewRecurring = document.getElementById('historySubviewRecurring');
+    dom.recSummaryExpense = document.getElementById('recSummaryExpense');
+    dom.recSummaryIncome = document.getElementById('recSummaryIncome');
+    dom.recSummaryNet = document.getElementById('recSummaryNet');
+
+    // Upcoming Bills & After-Bills Budget
+    dom.upcomingBillsList = document.getElementById('upcomingBillsList');
+    dom.upcomingBillsCount = document.getElementById('upcomingBillsCount');
+    dom.analyticsAfterBills = document.getElementById('analyticsAfterBills');
+    dom.analyticsTrueDailyPace = document.getElementById('analyticsTrueDailyPace');
+
+    // Edit Transaction Modal
+    dom.editTxModal = document.getElementById('editTxModal');
+    dom.closeEditTxModalBtn = document.getElementById('closeEditTxModalBtn');
+    dom.editTxId = document.getElementById('editTxId');
+    dom.editTxAmount = document.getElementById('editTxAmount');
+    dom.editTxCategory = document.getElementById('editTxCategory');
+    dom.editTxNote = document.getElementById('editTxNote');
+    dom.editTxDate = document.getElementById('editTxDate');
+    dom.editTxTypeChips = document.getElementById('editTxTypeChips');
+    dom.editTxMethodChips = document.getElementById('editTxMethodChips');
+    dom.saveEditTxBtn = document.getElementById('saveEditTxBtn');
   }
 
   // ============================================================================
@@ -984,6 +1011,39 @@
     processSyncQueue();
   }
 
+  function sendUpdateSync(tx) {
+    if (!state.settings.sheetsUrl) return;
+
+    // If this transaction is currently pending in syncQueue as an unsent new add, update it in place
+    const pendingAddIdx = state.syncQueue.findIndex(item => !item.action && item.id === tx.id);
+    if (pendingAddIdx !== -1) {
+      state.syncQueue[pendingAddIdx] = { ...tx };
+      saveSyncQueue();
+      return;
+    }
+
+    // If already queued as a pending update, update the payload
+    const pendingUpdateIdx = state.syncQueue.findIndex(item => item.action === 'update' && item.id === tx.id);
+    if (pendingUpdateIdx !== -1) {
+      state.syncQueue[pendingUpdateIdx] = { action: 'update', id: tx.id, item: { ...tx } };
+      saveSyncQueue();
+      return;
+    }
+
+    const payload = { action: 'update', id: tx.id, item: { ...tx } };
+    state.syncQueue.push(payload);
+    saveSyncQueue();
+    updatePendingBadge();
+
+    if (syncQueueDebounceTimer) {
+      clearTimeout(syncQueueDebounceTimer);
+    }
+    syncQueueDebounceTimer = setTimeout(() => {
+      syncQueueDebounceTimer = null;
+      processSyncQueue();
+    }, 4000);
+  }
+
   function sendClearAllSync() {
     if (!state.settings.sheetsUrl) return;
     state.syncQueue = [{ action: 'clearAll' }];
@@ -1152,7 +1212,12 @@
       dom.glanceRemaining.style.color = '#34D399';
     }
 
-    dom.glanceDailyAmount.textContent = `${sym}${metrics.dailySafeSpend.toFixed(2)}/day`;
+    // Factor in upcoming uncommitted bills for true daily safe-to-spend
+    const uncommitted = getUncommittedRecurringThisMonth();
+    const trueRemaining = Math.max(0, metrics.remaining - uncommitted.totalExpense);
+    const trueDailySafe = metrics.daysLeft > 0 ? trueRemaining / metrics.daysLeft : 0;
+
+    dom.glanceDailyAmount.textContent = `${sym}${trueDailySafe.toFixed(2)}/day`;
   }
 
   function updateTopMonthHeader() {
@@ -1257,9 +1322,14 @@
             </div>
             <div class="tx-right">
               <span class="${amountClass}">${amountPrefix}${state.settings.currency}${tx.amount.toFixed(2)}</span>
-              <button type="button" class="tx-delete-btn" data-delete-id="${tx.id}" title="Delete entry" aria-label="Delete entry">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-              </button>
+              <div class="tx-actions">
+                <button type="button" class="tx-edit-btn" data-edit-id="${tx.id}" title="Edit entry" aria-label="Edit entry">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button type="button" class="tx-delete-btn" data-delete-id="${tx.id}" title="Delete entry" aria-label="Delete entry">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
             </div>
           </div>
         `;
@@ -1270,11 +1340,42 @@
 
     dom.transactionsFeed.innerHTML = html;
 
+    // Edit button handlers
+    dom.transactionsFeed.querySelectorAll('.tx-edit-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const txId = btn.getAttribute('data-edit-id');
+        openEditTransactionModal(txId);
+      });
+    });
+
+    // Delete button handlers (two-tap confirmation)
     dom.transactionsFeed.querySelectorAll('.tx-delete-btn').forEach(btn => {
+      let confirmTimer = null;
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const txId = btn.getAttribute('data-delete-id');
-        deleteTransaction(txId);
+        const txCard = btn.closest('.tx-card');
+
+        if (btn.classList.contains('confirming')) {
+          // Second tap — actually delete
+          clearTimeout(confirmTimer);
+          btn.classList.remove('confirming');
+          if (txCard) txCard.classList.remove('confirm-delete');
+          deleteTransaction(txId);
+        } else {
+          // First tap — enter confirmation state
+          triggerHaptic(12);
+          btn.classList.add('confirming');
+          btn.innerHTML = 'Delete?';
+          if (txCard) txCard.classList.add('confirm-delete');
+
+          confirmTimer = setTimeout(() => {
+            btn.classList.remove('confirming');
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+            if (txCard) txCard.classList.remove('confirm-delete');
+          }, 3500);
+        }
       });
     });
   }
@@ -1372,13 +1473,29 @@
     dom.analyticsDailyPace.textContent = `${sym}${metrics.dailySafeSpend.toFixed(2)} / day`;
     dom.analyticsDaysLeft.textContent = metrics.daysLeft;
 
-    // 3. Per-Category Budget Progress Meters (Groceries, Gas, Misc, etc.)
+    // 3. After-Bills Budget (subtract upcoming recurring not yet posted)
+    const uncommittedBills = getUncommittedRecurringThisMonth();
+    const afterBillsRemaining = Math.max(0, metrics.remaining - uncommittedBills.totalExpense);
+    const trueDailyPace = metrics.daysLeft > 0 ? afterBillsRemaining / metrics.daysLeft : 0;
+
+    if (dom.analyticsAfterBills) {
+      dom.analyticsAfterBills.textContent = `${sym}${afterBillsRemaining.toFixed(2)}`;
+      dom.analyticsAfterBills.style.color = afterBillsRemaining < 100 ? 'var(--accent-rose)' : 'var(--accent-amber)';
+    }
+    if (dom.analyticsTrueDailyPace) {
+      dom.analyticsTrueDailyPace.textContent = `${sym}${trueDailyPace.toFixed(2)} / day`;
+    }
+
+    // 4. Per-Category Budget Progress Meters (Groceries, Gas, Misc, etc.)
     renderCategoryBudgetMeters(metrics.categoryTotals);
 
-    // 4. Donut Chart & Category Bars
+    // 5. Donut Chart & Category Bars
     renderDonutChart(metrics.categoryTotals, metrics.spent);
     renderCategoryBars(metrics.categoryTotals, metrics.spent);
     renderPaymentBreakdown(metrics.methodTotals);
+
+    // 6. Upcoming Bills Timeline
+    renderUpcomingBills();
   }
 
   function renderCategoryBudgetMeters(categoryTotals) {
@@ -1521,6 +1638,314 @@
     });
 
     dom.methodBreakdownRow.innerHTML = html;
+  }
+
+  // ============================================================================
+  // UPCOMING BILLS & UNCOMMITTED RECURRING CALCULATIONS
+  // ============================================================================
+  function getUncommittedRecurringThisMonth() {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const todayStr = now.toISOString().split('T')[0];
+    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+
+    let totalExpense = 0;
+    let totalIncome = 0;
+    const items = [];
+
+    (state.recurringRules || []).forEach(rule => {
+      if (!rule.active) return;
+
+      // Simulate upcoming occurrences this month that haven't been posted yet
+      let nextDate = rule.nextDueDate;
+      if (!nextDate) return;
+
+      let safetyLimit = 0;
+      while (nextDate <= lastDayOfMonth && safetyLimit < 10) {
+        safetyLimit++;
+        if (nextDate >= todayStr) {
+          const isPosted = state.transactions.some(tx =>
+            tx.note && tx.note.includes(rule.title) &&
+            tx.note.includes('(Recurring)') &&
+            tx.date === nextDate
+          );
+
+          items.push({
+            title: rule.title,
+            amount: rule.amount,
+            type: rule.type || 'expense',
+            date: nextDate,
+            frequency: rule.frequency,
+            posted: isPosted
+          });
+
+          if (!isPosted) {
+            if (rule.type === 'income') {
+              totalIncome += rule.amount;
+            } else {
+              totalExpense += rule.amount;
+            }
+          }
+        }
+
+        // Advance to next occurrence
+        nextDate = getNextOccurrence(nextDate, rule.frequency);
+      }
+    });
+
+    // Sort by date
+    items.sort((a, b) => a.date.localeCompare(b.date));
+
+    return { items, totalExpense, totalIncome };
+  }
+
+  function renderUpcomingBills() {
+    if (!dom.upcomingBillsList) return;
+
+    const upcoming = getUncommittedRecurringThisMonth();
+    const sym = state.settings.currency;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    if (dom.upcomingBillsCount) {
+      dom.upcomingBillsCount.textContent = `${upcoming.items.length} this month`;
+    }
+
+    if (upcoming.items.length === 0) {
+      dom.upcomingBillsList.innerHTML = '<div class="upcoming-bills-empty">No upcoming bills this month. Add recurring rules in History \u003e Recurring.</div>';
+      return;
+    }
+
+    let html = '';
+    upcoming.items.forEach(item => {
+      const isIncome = item.type === 'income';
+      const prefix = isIncome ? '+' : '-';
+      const amountClass = isIncome ? 'upcoming-bill-amount income' : 'upcoming-bill-amount expense';
+      const isPastDue = item.date < todayStr && !item.posted;
+      let itemClass = 'upcoming-bill-item';
+      if (item.posted) itemClass += ' posted';
+      else if (isPastDue) itemClass += ' past-due';
+
+      const dateObj = new Date(item.date + 'T00:00:00');
+      const dateLabel = dateObj.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+
+      html += `
+        <div class="${itemClass}">
+          <div class="upcoming-bill-left">
+            <span class="upcoming-bill-date">${dateLabel}</span>
+            <span class="upcoming-bill-name">${escapeHtml(item.title)}${item.posted ? ' \u2713' : ''}</span>
+          </div>
+          <span class="${amountClass}">${prefix}${sym}${item.amount.toFixed(2)}</span>
+        </div>
+      `;
+    });
+
+    dom.upcomingBillsList.innerHTML = html;
+  }
+
+  // ============================================================================
+  // RECURRING SUMMARY (History > Recurring sub-tab)
+  // ============================================================================
+  function renderRecurringSummary() {
+    const sym = state.settings.currency;
+    let monthlyExpense = 0;
+    let monthlyIncome = 0;
+
+    (state.recurringRules || []).forEach(r => {
+      if (!r.active) return;
+      let monthlyEquiv = r.amount;
+      if (r.frequency === 'weekly') monthlyEquiv = (r.amount * 52) / 12;
+      else if (r.frequency === 'biweekly') monthlyEquiv = (r.amount * 26) / 12;
+      else if (r.frequency === 'yearly') monthlyEquiv = r.amount / 12;
+
+      if (r.type === 'income') {
+        monthlyIncome += monthlyEquiv;
+      } else {
+        monthlyExpense += monthlyEquiv;
+      }
+    });
+
+    const net = monthlyIncome - monthlyExpense;
+
+    if (dom.recSummaryExpense) {
+      dom.recSummaryExpense.textContent = `-${sym}${monthlyExpense.toFixed(2)}`;
+    }
+    if (dom.recSummaryIncome) {
+      dom.recSummaryIncome.textContent = `+${sym}${monthlyIncome.toFixed(2)}`;
+    }
+    if (dom.recSummaryNet) {
+      const sign = net >= 0 ? '+' : '-';
+      dom.recSummaryNet.textContent = `${sign}${sym}${Math.abs(net).toFixed(2)}`;
+      dom.recSummaryNet.style.color = net >= 0 ? 'var(--primary-light)' : 'var(--accent-rose)';
+    }
+  }
+
+  // ============================================================================
+  // HISTORY SUB-TAB SWITCHING
+  // ============================================================================
+  function setupHistorySubTabs() {
+    const tabs = [dom.subtabTransactions, dom.subtabRecurring];
+    const views = {
+      transactions: dom.historySubviewTransactions,
+      recurring: dom.historySubviewRecurring
+    };
+
+    tabs.forEach(tab => {
+      if (!tab) return;
+      tab.addEventListener('click', () => {
+        triggerHaptic(14);
+        const target = tab.getAttribute('data-subtab');
+
+        tabs.forEach(t => {
+          if (t) {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+          }
+        });
+        tab.classList.add('active');
+        tab.setAttribute('aria-selected', 'true');
+
+        Object.values(views).forEach(v => {
+          if (v) v.classList.remove('active-subview');
+        });
+        if (views[target]) {
+          views[target].classList.add('active-subview');
+        }
+
+        if (target === 'recurring') {
+          renderRecurringList();
+          renderRecurringSummary();
+        }
+      });
+    });
+  }
+
+  // ============================================================================
+  // EDIT TRANSACTION MODAL
+  // ============================================================================
+  let editTxType = 'expense';
+  let editTxMethod = 'Card';
+
+  function openEditTransactionModal(txId) {
+    const tx = state.transactions.find(t => t.id === txId);
+    if (!tx) return;
+
+    triggerHaptic(15);
+    dom.editTxId.value = tx.id;
+    dom.editTxAmount.value = tx.amount;
+    dom.editTxNote.value = tx.note || '';
+    dom.editTxDate.value = tx.date || '';
+
+    // Set type
+    editTxType = tx.type || 'expense';
+    dom.editTxTypeChips.querySelectorAll('.method-chip').forEach(c => {
+      c.classList.remove('active');
+      if (c.getAttribute('data-edit-type') === editTxType) c.classList.add('active');
+    });
+
+    // Populate categories based on type
+    populateEditCategories();
+    dom.editTxCategory.value = tx.categoryId || '';
+
+    // Set method
+    editTxMethod = tx.method || 'Card';
+    dom.editTxMethodChips.querySelectorAll('.method-chip').forEach(c => {
+      c.classList.remove('active');
+      if (c.getAttribute('data-edit-method') === editTxMethod) c.classList.add('active');
+    });
+
+    dom.editTxModal.classList.remove('hidden');
+    dom.editTxAmount.focus();
+  }
+
+  function populateEditCategories() {
+    const isIncome = editTxType === 'income';
+    const catList = isIncome ? state.incomeCategories : state.categories;
+    dom.editTxCategory.innerHTML = catList.map(c =>
+      `<option value="${c.id}">${escapeHtml(c.name)}</option>`
+    ).join('');
+  }
+
+  function setupEditTransactionModal() {
+    if (dom.closeEditTxModalBtn) {
+      dom.closeEditTxModalBtn.addEventListener('click', () => {
+        dom.editTxModal.classList.add('hidden');
+      });
+    }
+
+    // Type toggle
+    if (dom.editTxTypeChips) {
+      dom.editTxTypeChips.querySelectorAll('.method-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          triggerHaptic(12);
+          dom.editTxTypeChips.querySelectorAll('.method-chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          editTxType = chip.getAttribute('data-edit-type');
+          populateEditCategories();
+        });
+      });
+    }
+
+    // Method toggle
+    if (dom.editTxMethodChips) {
+      dom.editTxMethodChips.querySelectorAll('.method-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          triggerHaptic(12);
+          dom.editTxMethodChips.querySelectorAll('.method-chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          editTxMethod = chip.getAttribute('data-edit-method');
+        });
+      });
+    }
+
+    // Save button
+    if (dom.saveEditTxBtn) {
+      dom.saveEditTxBtn.addEventListener('click', () => {
+        saveEditedTransaction();
+      });
+    }
+  }
+
+  function saveEditedTransaction() {
+    const txId = dom.editTxId.value;
+    const tx = state.transactions.find(t => t.id === txId);
+    if (!tx) return;
+
+    const newAmount = parseFloat(dom.editTxAmount.value);
+    if (isNaN(newAmount) || newAmount <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+
+    triggerHaptic(20);
+
+    const isIncome = editTxType === 'income';
+    const catList = isIncome ? state.incomeCategories : state.categories;
+    const categoryObj = catList.find(c => c.id === dom.editTxCategory.value) || catList[0];
+
+    // Update transaction
+    tx.type = editTxType;
+    tx.amount = parseFloat(newAmount.toFixed(2));
+    tx.category = categoryObj.name;
+    tx.categoryId = categoryObj.id;
+    tx.note = dom.editTxNote.value.trim() || categoryObj.name;
+    tx.method = editTxMethod;
+    tx.date = dom.editTxDate.value || tx.date;
+    tx.dateStr = tx.date;
+    tx.synced = false;
+
+    saveTransactions();
+
+    // Sync: update in Google Sheets
+    sendUpdateSync(tx);
+
+    dom.editTxModal.classList.add('hidden');
+
+    renderHistoryFeed();
+    renderGlanceBar();
+    renderAnalytics();
+
+    showToast('Transaction Updated', `${state.settings.currency}${tx.amount.toFixed(2)} - ${categoryObj.name}`, 'check');
   }
 
   // ============================================================================
@@ -2304,12 +2729,12 @@
 
     if (viewId === 'view-history') {
       renderHistoryFeed();
+      renderRecurringList();
+      renderRecurringSummary();
     } else if (viewId === 'view-analytics') {
       renderAnalytics();
     } else if (viewId === 'view-add') {
       renderGlanceBar();
-    } else if (viewId === 'view-settings') {
-      renderRecurringList();
     }
     checkAndProcessRecurring();
 
@@ -2589,7 +3014,10 @@
     attachEventListeners();
     setupCategoryModal();
     setupRecurringManager();
+    setupHistorySubTabs();
+    setupEditTransactionModal();
     renderRecurringList();
+    renderRecurringSummary();
     checkAndProcessRecurring();
     setupVoiceRecognition();
     setupNavigation();

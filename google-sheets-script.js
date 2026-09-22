@@ -222,6 +222,69 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // ACTION: Update a specific transaction in-place by ID
+    if (data.action === "update" && (data.id || (data.item && data.item.id))) {
+      var updateItem = data.item || data;
+      var updateId = String(data.id || updateItem.id);
+      var lastRow = sheet.getLastRow();
+      var updated = false;
+
+      if (lastRow > 1) {
+        var idRange = sheet.getRange(2, 8, lastRow - 1, 1).getValues();
+        for (var r = 0; r < idRange.length; r++) {
+          if (String(idRange[r][0]) === updateId) {
+            var rowNum = r + 2;
+            var dateObj = updateItem.date ? new Date(updateItem.date) : new Date();
+            var formattedDate = updateItem.dateStr || Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "yyyy-MM-dd");
+            var formattedTime = updateItem.timeStr || Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "HH:mm:ss");
+            var typeStr = (updateItem.type === "income" || updateItem.type === "Income") ? "Income" : "Expense";
+            var parsedAmount = parseFloat(updateItem.amount || 0);
+
+            // Columns 1-7: Type, Date, Time, Amount ($), Category, Note / Merchant, Payment Method
+            sheet.getRange(rowNum, 1, 1, 7).setValues([[
+              typeStr,
+              formattedDate,
+              formattedTime,
+              parsedAmount,
+              updateItem.category || "General",
+              updateItem.note || "",
+              updateItem.method || "Card"
+            ]]);
+            updated = true;
+            break;
+          }
+        }
+      }
+
+      // If ID not found in sheet, append it cleanly as a new row
+      if (!updated) {
+        var dateObj = updateItem.date ? new Date(updateItem.date) : new Date();
+        var formattedDate = updateItem.dateStr || Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "yyyy-MM-dd");
+        var formattedTime = updateItem.timeStr || Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "HH:mm:ss");
+        var typeStr = (updateItem.type === "income" || updateItem.type === "Income") ? "Income" : "Expense";
+        sheet.appendRow([
+          typeStr,
+          formattedDate,
+          formattedTime,
+          parseFloat(updateItem.amount || 0),
+          updateItem.category || "General",
+          updateItem.note || "",
+          updateItem.method || "Card",
+          updateId,
+          updateItem.createdAt || new Date().toISOString()
+        ]);
+        updated = true;
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        action: "update",
+        updated: updated,
+        id: updateId,
+        timestamp: new Date().toISOString()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // ACTION: Clear all data rows (preserves header row 1)
     if (data.action === "clearAll") {
       var lastRow = sheet.getLastRow();

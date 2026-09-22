@@ -2464,3 +2464,253 @@ input:checked + .slider-small:before {
 .hidden {
   display: none !important;
 }
+
+/* ==========================================================================
+   HISTORY SUB-TAB BAR (Transactions | Recurring)
+   ========================================================================== */
+
+.history-subtab-bar {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+}
+
+.history-subtab {
+  flex: 1;
+  padding: 9px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: calc(var(--radius-sm) - 2px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.history-subtab.active {
+  background: var(--bg-card);
+  color: var(--text-main);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.history-subtab:hover:not(.active) {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.history-subview {
+  display: none;
+}
+
+.history-subview.active-subview {
+  display: block;
+}
+
+/* ==========================================================================
+   RECURRING SUMMARY CARD
+   ========================================================================== */
+
+.recurring-summary-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.recurring-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+}
+
+.recurring-summary-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.recurring-summary-val {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  color: var(--text-main);
+}
+
+.recurring-summary-val.expense {
+  color: var(--accent-rose);
+}
+
+.recurring-summary-val.income {
+  color: var(--primary-light);
+}
+
+.recurring-summary-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 6px 0;
+}
+
+/* ==========================================================================
+   UPCOMING BILLS CARD (Insights)
+   ========================================================================== */
+
+.upcoming-bills-card {
+  border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.upcoming-count-badge {
+  font-size: 0.75rem;
+  color: var(--accent-amber);
+  font-weight: 600;
+  padding: 3px 10px;
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.upcoming-bills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.upcoming-bill-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-xs);
+  border-left: 3px solid var(--accent-amber);
+  transition: all 0.2s ease;
+}
+
+.upcoming-bill-item.past-due {
+  border-left-color: var(--accent-rose);
+  background: rgba(244, 63, 94, 0.06);
+}
+
+.upcoming-bill-item.posted {
+  border-left-color: var(--primary);
+  opacity: 0.6;
+}
+
+.upcoming-bill-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.upcoming-bill-date {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  min-width: 50px;
+  text-align: center;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+}
+
+.upcoming-bill-name {
+  font-size: 0.84rem;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.upcoming-bill-amount {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.upcoming-bill-amount.expense {
+  color: var(--accent-rose);
+}
+
+.upcoming-bill-amount.income {
+  color: var(--primary-light);
+}
+
+.upcoming-bills-empty {
+  text-align: center;
+  padding: 16px 10px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+/* ==========================================================================
+   AFTER BILLS BUDGET ROW
+   ========================================================================== */
+
+.after-bills-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-subtle);
+  gap: 0;
+}
+
+.after-bills-item .pace-label {
+  font-size: 0.7rem;
+  color: var(--accent-amber);
+}
+
+/* ==========================================================================
+   DELETE CONFIRMATION STATE
+   ========================================================================== */
+
+.tx-card.confirm-delete {
+  border: 1px solid rgba(244, 63, 94, 0.4) !important;
+  background: rgba(244, 63, 94, 0.06) !important;
+  animation: shakeOnce 0.35s ease;
+}
+
+@keyframes shakeOnce {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+.tx-delete-btn.confirming {
+  background: rgba(244, 63, 94, 0.15) !important;
+  color: var(--accent-rose) !important;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  min-width: 56px;
+}
+
+/* Edit button in transaction cards */
+.tx-edit-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.tx-edit-btn:hover {
+  color: var(--primary-light);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.tx-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

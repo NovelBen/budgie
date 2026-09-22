@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="index.css?v=7">
+  <link rel="stylesheet" href="index.css?v=8">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -242,54 +242,95 @@
       </section>
 
       <!-- ========================================== -->
-      <!-- VIEW 2: TRANSACTIONS HISTORY -->
+      <!-- VIEW 2: TRANSACTIONS HISTORY & RECURRING -->
       <!-- ========================================== -->
       <section id="view-history" class="app-view" aria-label="Transaction History">
         
         <div class="view-header">
           <div class="section-title-row" style="margin-bottom: 4px;">
-            <h2 class="view-title" style="margin-bottom: 0;">Transactions</h2>
+            <h2 class="view-title" style="margin-bottom: 0;">History</h2>
             <button type="button" class="text-link-btn danger-link" id="clearAllHistoryBtn">Clear All</button>
           </div>
+        </div>
+
+        <!-- Sub-Tab Toggle: Transactions | Recurring -->
+        <div class="history-subtab-bar" role="tablist" aria-label="History Sub-Tabs">
+          <button type="button" class="history-subtab active" id="subtabTransactions" data-subtab="transactions" role="tab" aria-selected="true">Transactions</button>
+          <button type="button" class="history-subtab" id="subtabRecurring" data-subtab="recurring" role="tab" aria-selected="false">Recurring</button>
+        </div>
+
+        <!-- SUB-VIEW: Transactions -->
+        <div id="historySubviewTransactions" class="history-subview active-subview">
           <div class="history-stats">
             <span id="historyCount">0 entries</span>
             <span class="dot-separator">•</span>
             <span id="historyTotalSpent">$0.00 spent</span>
           </div>
-        </div>
 
-        <!-- History Search & Filter -->
-        <div class="filter-bar">
-          <div class="search-input-wrap">
-            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input type="text" id="historySearchInput" class="search-input" placeholder="Search merchant, note, or category...">
-            <button id="clearSearchBtn" class="clear-search-btn hidden" aria-label="Clear search">×</button>
+          <!-- History Search & Filter -->
+          <div class="filter-bar">
+            <div class="search-input-wrap">
+              <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="historySearchInput" class="search-input" placeholder="Search merchant, note, or category...">
+              <button id="clearSearchBtn" class="clear-search-btn hidden" aria-label="Clear search">×</button>
+            </div>
+
+            <!-- Category Filter Scroller -->
+            <div class="category-filter-pills" id="categoryFilterPills">
+              <button type="button" class="filter-pill active" data-filter="all">All</button>
+            </div>
           </div>
 
-          <!-- Category Filter Scroller -->
-          <div class="category-filter-pills" id="categoryFilterPills">
-            <button type="button" class="filter-pill active" data-filter="all">All</button>
+          <!-- Transactions Feed -->
+          <div class="transactions-feed" id="transactionsFeed">
+            <!-- Populated dynamically -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="historyEmptyState" class="empty-state hidden">
+            <div class="empty-icon">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
+              </svg>
+            </div>
+            <h3 class="empty-title">No transactions yet</h3>
+            <p class="empty-desc">Tap the Speed Add tab to log your first expense in 2 seconds.</p>
           </div>
         </div>
 
-        <!-- Transactions Feed -->
-        <div class="transactions-feed" id="transactionsFeed">
-          <!-- Populated dynamically -->
-        </div>
-
-        <!-- Empty State -->
-        <div id="historyEmptyState" class="empty-state hidden">
-          <div class="empty-icon">
-            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-              <line x1="2" y1="10" x2="22" y2="10"></line>
-            </svg>
+        <!-- SUB-VIEW: Recurring Bills & Subscriptions -->
+        <div id="historySubviewRecurring" class="history-subview">
+          <div class="section-title-row" style="margin-bottom: 8px;">
+            <div>
+              <p class="settings-desc" style="margin: 0;">Auto-adds on schedule (Rent, Netflix, Gym, Paychecks).</p>
+            </div>
+            <button type="button" id="openAddRecurringBtn" class="action-btn secondary-btn" style="padding: 6px 12px; font-size: 0.78rem;">+ Add Rule</button>
           </div>
-          <h3 class="empty-title">No transactions yet</h3>
-          <p class="empty-desc">Tap the Speed Add tab to log your first expense in 2 seconds.</p>
+
+          <!-- Monthly Recurring Commitment Summary -->
+          <div class="recurring-summary-card" id="recurringSummaryCard">
+            <div class="recurring-summary-row">
+              <span class="recurring-summary-label">Monthly Bills Total</span>
+              <span class="recurring-summary-val expense" id="recSummaryExpense">-$0.00</span>
+            </div>
+            <div class="recurring-summary-row">
+              <span class="recurring-summary-label">Monthly Income Total</span>
+              <span class="recurring-summary-val income" id="recSummaryIncome">+$0.00</span>
+            </div>
+            <div class="recurring-summary-divider"></div>
+            <div class="recurring-summary-row">
+              <span class="recurring-summary-label" style="font-weight: 600;">Net Recurring</span>
+              <span class="recurring-summary-val" id="recSummaryNet" style="font-weight: 700;">$0.00</span>
+            </div>
+          </div>
+
+          <div class="recurring-list" id="recurringList">
+            <!-- Dynamically populated recurring cards -->
+          </div>
         </div>
 
       </section>
@@ -364,6 +405,31 @@
               <span class="pace-label">Days Left</span>
               <span class="pace-val" id="analyticsDaysLeft">30</span>
             </div>
+          </div>
+
+          <!-- Remaining After Bills -->
+          <div class="after-bills-container">
+            <div class="pace-divider"></div>
+            <div class="pace-item after-bills-item">
+              <span class="pace-label">After Upcoming Bills</span>
+              <span class="pace-val" id="analyticsAfterBills">$0.00</span>
+            </div>
+            <div class="pace-divider"></div>
+            <div class="pace-item after-bills-item">
+              <span class="pace-label">True Daily Pace</span>
+              <span class="pace-val highlight" id="analyticsTrueDailyPace">$0.00 / day</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upcoming Bills This Month -->
+        <div class="analytics-card upcoming-bills-card">
+          <div class="section-title-row" style="margin-bottom: 8px;">
+            <h3 class="card-subtitle" style="margin-bottom: 0;">Upcoming Bills</h3>
+            <span class="upcoming-count-badge" id="upcomingBillsCount">0 this month</span>
+          </div>
+          <div class="upcoming-bills-list" id="upcomingBillsList">
+            <!-- Dynamically populated -->
           </div>
         </div>
 
@@ -541,20 +607,7 @@
           </div>
         </div>
 
-        <!-- Recurring Expenses & Subscriptions Manager Card -->
-        <div class="settings-card" id="recurringSettingsCard">
-          <div class="section-title-row" style="margin-bottom: 8px;">
-            <div>
-              <h3 class="settings-title">Recurring Bills & Subscriptions</h3>
-              <p class="settings-desc">Auto-adds on schedule (Rent, Netflix, Gym, Paychecks).</p>
-            </div>
-            <button type="button" id="openAddRecurringBtn" class="action-btn secondary-btn" style="padding: 6px 12px; font-size: 0.78rem;">+ Add Rule</button>
-          </div>
-
-          <div class="recurring-list" id="recurringList">
-            <!-- Dynamically populated recurring cards -->
-          </div>
-        </div>
+        <!-- Note: Recurring Bills & Subscriptions have moved to History > Recurring tab -->
 
         <!-- Data Backup & CSV Export -->
         <div class="settings-card">
@@ -819,8 +872,67 @@
       </div>
     </div>
 
+    <!-- Edit Transaction Modal -->
+    <div id="editTxModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">Edit Transaction</h3>
+          <button type="button" id="closeEditTxModalBtn" class="close-btn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editTxId" value="">
+
+          <!-- Type Toggle -->
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <div class="method-chips" id="editTxTypeChips">
+              <button type="button" class="method-chip active" data-edit-type="expense">Expense</button>
+              <button type="button" class="method-chip" data-edit-type="income">Income</button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="editTxAmount" class="form-label">Amount</label>
+              <input type="number" id="editTxAmount" class="form-input" min="0.01" step="0.01" placeholder="0.00">
+            </div>
+            <div class="form-group flex-1">
+              <label for="editTxCategory" class="form-label">Category</label>
+              <select id="editTxCategory" class="form-input select-input">
+                <!-- Dynamically populated -->
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="editTxNote" class="form-label">Note / Merchant</label>
+            <input type="text" id="editTxNote" class="form-input" placeholder="e.g. Chipotle, Trader Joe's..." maxlength="80">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label class="form-label">Payment Method</label>
+              <div class="method-chips" id="editTxMethodChips">
+                <button type="button" class="method-chip active" data-edit-method="Card">Card</button>
+                <button type="button" class="method-chip" data-edit-method="Cash">Cash</button>
+                <button type="button" class="method-chip" data-edit-method="Venmo">Venmo</button>
+                <button type="button" class="method-chip" data-edit-method="Other">Other</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="editTxDate" class="form-label">Date</label>
+              <input type="date" id="editTxDate" class="form-input date-input">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="saveEditTxBtn" class="action-btn primary-btn">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
