@@ -2219,6 +2219,12 @@
       renderRecurringList();
     }
     checkAndProcessRecurring();
+
+    // Reset view scroll position to top
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+      mainContent.scrollTop = 0;
+    }
   }
 
   // ============================================================================
