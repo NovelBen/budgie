@@ -1441,8 +1441,8 @@
     let monthlyRecurTotal = 0;
     (state.recurringRules || []).forEach(r => {
       if (!r.active || r.type === 'income') return;
-      if (r.frequency === 'weekly') monthlyRecurTotal += (r.amount * 52) / 12;
-      else if (r.frequency === 'biweekly') monthlyRecurTotal += (r.amount * 26) / 12;
+      if (r.frequency === 'weekly') monthlyRecurTotal += r.amount * 4;
+      else if (r.frequency === 'biweekly') monthlyRecurTotal += r.amount * 2;
       else if (r.frequency === 'semimonthly') monthlyRecurTotal += r.amount * 2;
       else if (r.frequency === 'yearly') monthlyRecurTotal += r.amount / 12;
       else monthlyRecurTotal += r.amount;
@@ -1756,10 +1756,11 @@
     (state.recurringRules || []).forEach(r => {
       if (!r.active) return;
       let monthlyEquiv = r.amount;
-      if (r.frequency === 'weekly') monthlyEquiv = (r.amount * 52) / 12;
-      else if (r.frequency === 'biweekly') monthlyEquiv = (r.amount * 26) / 12;
+      if (r.frequency === 'weekly') monthlyEquiv = r.amount * 4;
+      else if (r.frequency === 'biweekly') monthlyEquiv = r.amount * 2;
       else if (r.frequency === 'semimonthly') monthlyEquiv = r.amount * 2;
       else if (r.frequency === 'yearly') monthlyEquiv = r.amount / 12;
+      else monthlyEquiv = r.amount;
 
       if (r.type === 'income') {
         monthlyIncome += monthlyEquiv;
@@ -2218,13 +2219,16 @@
 
   function formatDateFriendly(dateStr) {
     if (!dateStr) return 'N/A';
-    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
     if (dateStr === todayStr) return 'Today';
-    
+    if (dateStr === tomorrowStr) return 'Tomorrow';
+
     const parts = dateStr.split('-');
     if (parts.length !== 3) return dateStr;
     const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    return d.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString('default', { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
   function checkAndProcessRecurring() {
@@ -2292,8 +2296,16 @@
       return;
     }
 
+    // Sort recurring rules chronologically by nextDueDate (closest upcoming first, active before paused)
+    const sortedRules = [...state.recurringRules].sort((a, b) => {
+      const dateA = a.nextDueDate || '9999-12-31';
+      const dateB = b.nextDueDate || '9999-12-31';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return (b.active ? 1 : 0) - (a.active ? 1 : 0);
+    });
+
     let html = '';
-    state.recurringRules.forEach(rule => {
+    sortedRules.forEach(rule => {
       const isIncome = rule.type === 'income';
       const amountPrefix = isIncome ? '+' : '-';
       const amountClass = isIncome ? 'recurring-amount income' : 'recurring-amount';

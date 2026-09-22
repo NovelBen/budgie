@@ -1,4 +1,4 @@
-const CACHE_NAME = 'budgie-cache-v9';
+const CACHE_NAME = 'budgie-cache-v10';
 const CORE_ASSETS = [
   './',
   './index.html',
