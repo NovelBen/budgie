@@ -300,7 +300,7 @@
       if (storedTx) {
         state.transactions = JSON.parse(storedTx);
       } else {
-        state.transactions = [...DEMO_TRANSACTIONS];
+        state.transactions = [];
         saveTransactions();
       }
 
@@ -309,7 +309,7 @@
 
     } catch (err) {
       console.error('Budgie: Error loading stored data:', err);
-      state.transactions = [...DEMO_TRANSACTIONS];
+      state.transactions = [];
       state.categories = [...DEFAULT_CATEGORIES];
       state.settings = { ...DEFAULT_SETTINGS };
       state.syncQueue = [];
@@ -1669,12 +1669,11 @@
     dom.importJsonInput.addEventListener('change', restoreFromJson);
 
     dom.resetDataBtn.addEventListener('click', () => {
-      if (confirm('Are you sure you want to reset all data to starter defaults? This will erase custom entries.')) {
-        state.transactions = [...DEMO_TRANSACTIONS];
-        state.categories = [...DEFAULT_CATEGORIES];
+      triggerHaptic(20);
+      if (confirm('Clear all transactions and start fresh at $0.00? Your categories and budget limits will be preserved.')) {
+        state.transactions = [];
         state.syncQueue = [];
         saveTransactions();
-        saveCategories();
         saveSyncQueue();
         renderCategoryGrid();
         renderCategoryFilterPills();
@@ -1682,7 +1681,7 @@
         renderHistoryFeed();
         renderAnalytics();
         renderCategoryLimitsEditor();
-        showToast('Data Reset', 'Restored to clean demo starter data', 'check');
+        showToast('All Cleared', 'Transactions cleared. Ready for real expenses!', 'check');
       }
     });
 
