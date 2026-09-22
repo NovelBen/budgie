@@ -130,10 +130,13 @@ function doPost(e) {
       }
       settingsSheet.clear();
 
+      var incomeVal = (data.settings && data.settings.expectedIncome !== undefined && data.settings.expectedIncome !== null && data.settings.expectedIncome !== "") ? parseFloat(data.settings.expectedIncome) : 3500;
+      var budgetVal = (data.settings && data.settings.monthlyBudget !== undefined && data.settings.monthlyBudget !== null && data.settings.monthlyBudget !== "") ? parseFloat(data.settings.monthlyBudget) : 2000;
+
       var setRows = [
         ["Setting", "Value", "Notes", ""],
-        ["Expected Monthly Income", parseFloat(data.settings && data.settings.expectedIncome || 3500), "Monthly baseline income", ""],
-        ["Overall Monthly Budget", parseFloat(data.settings && data.settings.monthlyBudget || 2000), "Monthly spending limit", ""],
+        ["Expected Monthly Income", incomeVal, "Monthly baseline income", ""],
+        ["Overall Monthly Budget", budgetVal, "Monthly spending limit", ""],
         ["Currency Symbol", String(data.settings && data.settings.currency || "$"), "Display currency", ""],
         ["Haptic Feedback", String(data.settings && data.settings.haptics !== false), "Vibration preference", ""],
         ["Last Updated", Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"), "Auto-synced from Budgie", ""],
