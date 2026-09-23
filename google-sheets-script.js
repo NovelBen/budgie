@@ -158,6 +158,15 @@ function doPost(e) {
         }
       }
 
+      if (data.savingsGoals && data.savingsGoals.length > 0) {
+        setRows.push(["", "", "", ""]);
+        setRows.push(["Savings Goal", "Target ($)", "Saved ($)", "Target Month"]);
+        for (var g = 0; g < data.savingsGoals.length; g++) {
+          var goal = data.savingsGoals[g];
+          setRows.push([goal.name || "", parseFloat(goal.targetAmount || 0), parseFloat(goal.savedAmount || 0), goal.targetMonth || "all"]);
+        }
+      }
+
       var maxCols = 4;
       settingsSheet.getRange(1, 1, setRows.length, maxCols).setValues(setRows);
 

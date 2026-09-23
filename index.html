@@ -423,6 +423,81 @@
           </div>
         </div>
 
+        <!-- Budget Overspend Recovery Banner (Dynamic) -->
+        <div id="overspendRecoveryBanner" class="analytics-card overspend-banner hidden">
+          <div class="overspend-banner-content">
+            <div class="overspend-banner-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <div class="overspend-banner-text">
+              <div class="overspend-banner-title" id="overspendBannerTitle">Previous Month Overspent</div>
+              <div class="overspend-banner-desc" id="overspendBannerDesc">You exceeded your budget by $0.00. Roll this over into a recovery savings goal?</div>
+            </div>
+          </div>
+          <div class="overspend-banner-actions">
+            <button type="button" id="rollOverspendGoalBtn" class="action-btn primary-btn overspend-action-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+              <span id="rollOverspendBtnText">Make Next Month Goal</span>
+            </button>
+            <button type="button" id="dismissOverspendBannerBtn" class="action-btn outline-btn overspend-dismiss-btn">Dismiss</button>
+          </div>
+        </div>
+
+        <!-- Savings Goals & Targets Card -->
+        <div class="analytics-card savings-goals-card" id="savingsGoalsCard">
+          <div class="section-title-row" style="margin-bottom: 10px;">
+            <div class="title-with-badge">
+              <h3 class="card-subtitle" style="margin-bottom: 0;">Savings Goals</h3>
+              <span class="active-goals-badge" id="activeGoalsCount">0 active</span>
+            </div>
+            <button type="button" id="openAddGoalBtn" class="action-btn secondary-btn" style="padding: 6px 12px; font-size: 0.78rem;">+ New Goal</button>
+          </div>
+
+          <!-- Savings Summary Mini Grid -->
+          <div class="savings-summary-grid">
+            <div class="savings-summary-item">
+              <span class="savings-summary-label">Target This Month</span>
+              <span class="savings-summary-val highlight" id="savingsTargetTotal">$0.00</span>
+            </div>
+            <div class="savings-summary-divider"></div>
+            <div class="savings-summary-item">
+              <span class="savings-summary-label">Saved Toward Goals</span>
+              <span class="savings-summary-val" id="savingsSavedTotal">$0.00</span>
+            </div>
+            <div class="savings-summary-divider"></div>
+            <div class="savings-summary-item">
+              <span class="savings-summary-label">Monthly Net Cash</span>
+              <span class="savings-summary-val" id="savingsMonthlySurplus">$0.00</span>
+            </div>
+          </div>
+
+          <!-- Savings Goals List -->
+          <div class="savings-goals-list" id="savingsGoalsList">
+            <!-- Dynamically populated goal cards -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="savingsGoalsEmptyState" class="goals-empty-state">
+            <div class="goals-empty-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </div>
+            <div class="goals-empty-text">
+              <div class="goals-empty-title">No savings goals yet</div>
+              <div class="goals-empty-desc">Create a goal for this month, or budget overspends will automatically roll into recovery targets.</div>
+            </div>
+            <button type="button" id="emptyAddGoalBtn" class="action-btn outline-btn" style="font-size: 0.78rem; padding: 6px 14px;">+ Create First Goal</button>
+          </div>
+        </div>
+
         <!-- Upcoming Bills This Month -->
         <div class="analytics-card upcoming-bills-card">
           <div class="section-title-row" style="margin-bottom: 8px;">
@@ -585,6 +660,17 @@
             </div>
             <label class="switch">
               <input type="checkbox" id="hapticsToggle" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+
+          <div class="form-group toggle-group">
+            <div class="toggle-text">
+              <label for="autoRollOverspendToggle" class="toggle-title">Auto-Roll Overspend to Saving Goal</label>
+              <span class="toggle-sub">Automatically creates next month recovery savings goal when spending exceeds budget</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="autoRollOverspendToggle" checked>
               <span class="slider round"></span>
             </label>
           </div>
@@ -934,8 +1020,130 @@
       </div>
     </div>
 
+    <!-- Savings Goal Create/Edit Modal -->
+    <div id="savingsGoalModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title" id="savingsGoalModalTitle">New Savings Goal</h3>
+          <button type="button" class="close-btn" id="closeSavingsGoalModalBtn" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <!-- Preset Goal Templates -->
+          <div class="form-group">
+            <label class="form-label">Quick Templates</label>
+            <div class="goal-preset-chips" id="goalPresetChips">
+              <button type="button" class="goal-preset-chip" data-preset="recoup">Recoup Overspend</button>
+              <button type="button" class="goal-preset-chip" data-preset="emergency">Emergency Buffer</button>
+              <button type="button" class="goal-preset-chip" data-preset="vacation">Vacation Fund</button>
+              <button type="button" class="goal-preset-chip" data-preset="gadget">Tech / Gadget</button>
+              <button type="button" class="goal-preset-chip" data-preset="rainy">Rainy Day</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="goalNameInput" class="form-label">Goal Name</label>
+            <input type="text" id="goalNameInput" class="form-input" placeholder="e.g. Recoup Sept Overspend, Vacation Fund" maxlength="36">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="goalTargetAmountInput" class="form-label">Target Amount ($)</label>
+              <input type="number" id="goalTargetAmountInput" class="form-input" min="1" step="10" placeholder="250.00">
+            </div>
+            <div class="form-group flex-1">
+              <label for="goalSavedAmountInput" class="form-label">Already Saved ($)</label>
+              <input type="number" id="goalSavedAmountInput" class="form-input" min="0" step="10" value="0" placeholder="0.00">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="goalTargetMonthInput" class="form-label">Target Month</label>
+            <div class="form-row">
+              <select id="goalTargetMonthSelect" class="form-input select-input flex-1">
+                <option value="current">This Month</option>
+                <option value="next">Next Month</option>
+                <option value="all">Ongoing / Continuous</option>
+                <option value="custom">Specific Month...</option>
+              </select>
+              <input type="month" id="goalCustomMonthInput" class="form-input flex-1 hidden">
+            </div>
+            <span class="field-hint" id="goalMonthDisplayHint">Goal applies to current monthly budget calculations</span>
+          </div>
+
+          <!-- Color & Accent Picker -->
+          <div class="form-group">
+            <label class="form-label">Accent Color</label>
+            <div class="color-picker-row" id="goalColorPickerRow">
+              <button type="button" class="color-opt active" data-color="#10B981" style="background: #10B981;"></button>
+              <button type="button" class="color-opt" data-color="#3B82F6" style="background: #3B82F6;"></button>
+              <button type="button" class="color-opt" data-color="#8B5CF6" style="background: #8B5CF6;"></button>
+              <button type="button" class="color-opt" data-color="#F59E0B" style="background: #F59E0B;"></button>
+              <button type="button" class="color-opt" data-color="#EC4899" style="background: #EC4899;"></button>
+              <button type="button" class="color-opt" data-color="#06B6D4" style="background: #06B6D4;"></button>
+              <button type="button" class="color-opt" data-color="#F43F5E" style="background: #F43F5E;"></button>
+            </div>
+          </div>
+
+          <!-- Icon Picker -->
+          <div class="form-group">
+            <label class="form-label">Icon</label>
+            <div class="icon-picker-row" id="goalIconPickerRow">
+              <button type="button" class="icon-opt active" data-icon="dollar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></button>
+              <button type="button" class="icon-opt" data-icon="star"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></button>
+              <button type="button" class="icon-opt" data-icon="gift"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg></button>
+              <button type="button" class="icon-opt" data-icon="activity"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg></button>
+              <button type="button" class="icon-opt" data-icon="box"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></button>
+              <button type="button" class="icon-opt" data-icon="tag"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <input type="hidden" id="editingGoalId" value="">
+          <button type="button" id="saveSavingsGoalBtn" class="action-btn primary-btn">Save Savings Goal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Goal Contribute / Progress Modal -->
+    <div id="goalContributeModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title" id="contributeModalTitle">Add to Savings Goal</h3>
+          <button type="button" class="close-btn" id="closeContributeModalBtn" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="contribute-goal-summary" id="contributeGoalSummary">
+            <span class="contribute-target-name" id="contributeGoalName">Goal Name</span>
+            <div class="contribute-target-numbers">
+              <span id="contributeCurrentSaved">$0.00</span> / <span id="contributeTargetTotal">$0.00</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Quick Add Chips</label>
+            <div class="contribute-preset-chips">
+              <button type="button" class="preset-chip contribute-chip" data-add="10">+$10</button>
+              <button type="button" class="preset-chip contribute-chip" data-add="25">+$25</button>
+              <button type="button" class="preset-chip contribute-chip" data-add="50">+$50</button>
+              <button type="button" class="preset-chip contribute-chip" data-add="100">+$100</button>
+              <button type="button" class="preset-chip contribute-chip special-surplus-chip" id="contributeSurplusChip">+Surplus</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="contributeAmountInput" class="form-label">Contribution Amount ($)</label>
+            <input type="number" id="contributeAmountInput" class="form-input" min="0.01" step="1" placeholder="50.00">
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; gap: 8px;">
+          <button type="button" id="subtractGoalProgressBtn" class="action-btn outline-btn" style="flex: 1;">Subtract</button>
+          <button type="button" id="submitGoalProgressBtn" class="action-btn primary-btn" style="flex: 2;">Add to Savings</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>

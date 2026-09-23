@@ -53,7 +53,9 @@
     CATEGORIES: 'budgie_categories_v3',
     SETTINGS: 'budgie_settings_v3',
     SYNC_QUEUE: 'budgie_sync_queue_v3',
-    RECURRING: 'budgie_recurring_v3'
+    RECURRING: 'budgie_recurring_v3',
+    SAVINGS_GOALS: 'budgie_savings_goals_v3',
+    DISMISSED_OVERSPENDS: 'budgie_dismissed_overspends_v3'
   };
 
   const DEFAULT_CATEGORIES = [
@@ -79,7 +81,8 @@
     monthlyBudget: 2000,
     currency: '$',
     sheetsUrl: '',
-    haptics: true
+    haptics: true,
+    autoRollOverspend: true
   };
 
   const DEMO_TRANSACTIONS = [
@@ -172,6 +175,19 @@
     newCategoryIcon: 'tag',
     newCategoryColor: '#84CC16',
     newCategoryBudget: 200,
+
+    // Savings Goals & Overspend Rollover State
+    savingsGoals: [],
+    dismissedOverspends: [],
+    editingGoalId: null,
+    contributingGoalId: null,
+    newGoalColor: '#10B981',
+    newGoalIcon: 'dollar',
+    pendingOverspendMonth: null,
+    pendingOverspendMonthName: '',
+    pendingOverspendAmount: 0,
+    pendingTargetMonth: '',
+    pendingTargetMonthName: '',
 
     deferredInstallPrompt: null
   };
@@ -315,6 +331,55 @@
     dom.analyticsAfterBills = document.getElementById('analyticsAfterBills');
     dom.analyticsTrueDailyPace = document.getElementById('analyticsTrueDailyPace');
 
+    // Overspend Recovery Banner & Savings Goals
+    dom.overspendRecoveryBanner = document.getElementById('overspendRecoveryBanner');
+    dom.overspendBannerTitle = document.getElementById('overspendBannerTitle');
+    dom.overspendBannerDesc = document.getElementById('overspendBannerDesc');
+    dom.rollOverspendGoalBtn = document.getElementById('rollOverspendGoalBtn');
+    dom.rollOverspendBtnText = document.getElementById('rollOverspendBtnText');
+    dom.dismissOverspendBannerBtn = document.getElementById('dismissOverspendBannerBtn');
+
+    dom.savingsGoalsCard = document.getElementById('savingsGoalsCard');
+    dom.activeGoalsCount = document.getElementById('activeGoalsCount');
+    dom.openAddGoalBtn = document.getElementById('openAddGoalBtn');
+    dom.emptyAddGoalBtn = document.getElementById('emptyAddGoalBtn');
+    dom.savingsTargetTotal = document.getElementById('savingsTargetTotal');
+    dom.savingsSavedTotal = document.getElementById('savingsSavedTotal');
+    dom.savingsMonthlySurplus = document.getElementById('savingsMonthlySurplus');
+    dom.savingsGoalsList = document.getElementById('savingsGoalsList');
+    dom.savingsGoalsEmptyState = document.getElementById('savingsGoalsEmptyState');
+
+    // Settings Toggle
+    dom.autoRollOverspendToggle = document.getElementById('autoRollOverspendToggle');
+
+    // Savings Goal Create/Edit Modal
+    dom.savingsGoalModal = document.getElementById('savingsGoalModal');
+    dom.savingsGoalModalTitle = document.getElementById('savingsGoalModalTitle');
+    dom.closeSavingsGoalModalBtn = document.getElementById('closeSavingsGoalModalBtn');
+    dom.goalPresetChips = document.getElementById('goalPresetChips');
+    dom.goalNameInput = document.getElementById('goalNameInput');
+    dom.goalTargetAmountInput = document.getElementById('goalTargetAmountInput');
+    dom.goalSavedAmountInput = document.getElementById('goalSavedAmountInput');
+    dom.goalTargetMonthSelect = document.getElementById('goalTargetMonthSelect');
+    dom.goalCustomMonthInput = document.getElementById('goalCustomMonthInput');
+    dom.goalMonthDisplayHint = document.getElementById('goalMonthDisplayHint');
+    dom.goalColorPickerRow = document.getElementById('goalColorPickerRow');
+    dom.goalIconPickerRow = document.getElementById('goalIconPickerRow');
+    dom.editingGoalId = document.getElementById('editingGoalId');
+    dom.saveSavingsGoalBtn = document.getElementById('saveSavingsGoalBtn');
+
+    // Goal Contribute Modal
+    dom.goalContributeModal = document.getElementById('goalContributeModal');
+    dom.contributeModalTitle = document.getElementById('contributeModalTitle');
+    dom.closeContributeModalBtn = document.getElementById('closeContributeModalBtn');
+    dom.contributeGoalName = document.getElementById('contributeGoalName');
+    dom.contributeCurrentSaved = document.getElementById('contributeCurrentSaved');
+    dom.contributeTargetTotal = document.getElementById('contributeTargetTotal');
+    dom.contributeAmountInput = document.getElementById('contributeAmountInput');
+    dom.contributeSurplusChip = document.getElementById('contributeSurplusChip');
+    dom.submitGoalProgressBtn = document.getElementById('submitGoalProgressBtn');
+    dom.subtractGoalProgressBtn = document.getElementById('subtractGoalProgressBtn');
+
     // Edit Transaction Modal
     dom.editTxModal = document.getElementById('editTxModal');
     dom.closeEditTxModalBtn = document.getElementById('closeEditTxModalBtn');
@@ -366,6 +431,12 @@
       const storedQueue = localStorage.getItem(STORAGE_KEYS.SYNC_QUEUE);
       state.syncQueue = storedQueue ? JSON.parse(storedQueue) : [];
 
+      const storedGoals = localStorage.getItem(STORAGE_KEYS.SAVINGS_GOALS);
+      state.savingsGoals = storedGoals ? JSON.parse(storedGoals) : [];
+
+      const storedDismissed = localStorage.getItem(STORAGE_KEYS.DISMISSED_OVERSPENDS);
+      state.dismissedOverspends = storedDismissed ? JSON.parse(storedDismissed) : [];
+
     } catch (err) {
       console.error('Budgie: Error loading stored data:', err);
       state.transactions = [];
@@ -373,6 +444,8 @@
       state.categories = [...DEFAULT_CATEGORIES];
       state.settings = { ...DEFAULT_SETTINGS };
       state.syncQueue = [];
+      state.savingsGoals = [];
+      state.dismissedOverspends = [];
     }
   }
 
@@ -414,6 +487,22 @@
       updatePendingBadge();
     } catch (e) {
       console.error('Error saving sync queue:', e);
+    }
+  }
+
+  function saveSavingsGoals() {
+    try {
+      localStorage.setItem(STORAGE_KEYS.SAVINGS_GOALS, JSON.stringify(state.savingsGoals));
+    } catch (e) {
+      console.error('Error saving savings goals:', e);
+    }
+  }
+
+  function saveDismissedOverspends() {
+    try {
+      localStorage.setItem(STORAGE_KEYS.DISMISSED_OVERSPENDS, JSON.stringify(state.dismissedOverspends));
+    } catch (e) {
+      console.error('Error saving dismissed overspends:', e);
     }
   }
 
@@ -920,7 +1009,16 @@
         icon: c.icon,
         budgetLimit: c.budgetLimit
       })),
-      recurringRules: state.recurringRules
+      recurringRules: state.recurringRules,
+      savingsGoals: (state.savingsGoals || []).map(g => ({
+        id: g.id,
+        name: g.name,
+        targetAmount: g.targetAmount,
+        savedAmount: g.savedAmount,
+        targetMonth: g.targetMonth,
+        completed: g.completed,
+        autoGeneratedFromOverspend: g.autoGeneratedFromOverspend
+      }))
     };
 
     // Replace any previous saveSettings in queue
@@ -1498,6 +1596,12 @@
 
     // 6. Upcoming Bills Timeline
     renderUpcomingBills();
+
+    // 7. Check Month Overspends & Rollover
+    checkMonthOverspends(metrics);
+
+    // 8. Savings Goals & Targets
+    renderSavingsGoals(metrics);
   }
 
   function renderCategoryBudgetMeters(categoryTotals) {
@@ -1746,6 +1850,264 @@
   }
 
   // ============================================================================
+  // SAVINGS GOALS & AUTOMATIC OVERSPEND ROLLOVER
+  // ============================================================================
+  function checkMonthOverspends(currentMetrics) {
+    if (!dom.overspendRecoveryBanner) return;
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const currentMonthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+    const budget = state.settings.monthlyBudget || 2000;
+    const sym = state.settings.currency;
+
+    // Check Previous Calendar Month
+    const prevDate = new Date(currentYear, currentMonth - 1, 1);
+    const prevYear = prevDate.getFullYear();
+    const prevMonth = prevDate.getMonth();
+    const prevMonthKey = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}`;
+    const prevMonthName = prevDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const currMonthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    let prevMonthSpent = 0;
+    state.transactions.forEach(tx => {
+      if (tx.type === 'income') return;
+      const d = new Date(tx.date || tx.createdAt);
+      if (d.getFullYear() === prevYear && d.getMonth() === prevMonth) {
+        prevMonthSpent += tx.amount;
+      }
+    });
+
+    const prevOverspend = prevMonthSpent - budget;
+    const prevHasGoal = (state.savingsGoals || []).some(g => g.overspentMonth === prevMonthKey);
+    const prevDismissed = (state.dismissedOverspends || []).includes(prevMonthKey);
+
+    // 1. Previous month overspent:
+    if (prevOverspend > 0 && !prevHasGoal && !prevDismissed) {
+      if (state.settings.autoRollOverspend) {
+        // Automatically create recoup goal for current month!
+        createOverspendRecoveryGoal(prevMonthKey, prevMonthName, prevOverspend, currentMonthKey, currMonthName, true);
+        dom.overspendRecoveryBanner.classList.add('hidden');
+        return;
+      } else {
+        // Show recovery banner prompting user
+        state.pendingOverspendMonth = prevMonthKey;
+        state.pendingOverspendMonthName = prevMonthName;
+        state.pendingOverspendAmount = prevOverspend;
+        state.pendingTargetMonth = currentMonthKey;
+        state.pendingTargetMonthName = currMonthName;
+
+        dom.overspendBannerTitle.textContent = `${prevMonthName} Budget Overspent`;
+        dom.overspendBannerDesc.textContent = `You exceeded your budget by ${sym}${prevOverspend.toFixed(2)} (${sym}${prevMonthSpent.toFixed(2)} spent vs ${sym}${budget.toFixed(2)} budget). Set a recovery savings goal for ${currMonthName}?`;
+        dom.rollOverspendBtnText.textContent = `Make ${currMonthName} Goal (${sym}${prevOverspend.toFixed(2)})`;
+        dom.overspendRecoveryBanner.classList.remove('hidden');
+        return;
+      }
+    }
+
+    // 2. Current Month is currently over budget
+    const currOverspend = (currentMetrics ? currentMetrics.spent : 0) - budget;
+    const currHasGoal = (state.savingsGoals || []).some(g => g.overspentMonth === currentMonthKey);
+    const currDismissed = (state.dismissedOverspends || []).includes(currentMonthKey);
+
+    if (currOverspend > 0 && !currHasGoal && !currDismissed) {
+      const nextDate = new Date(currentYear, currentMonth + 1, 1);
+      const nextYear = nextDate.getFullYear();
+      const nextMonth = nextDate.getMonth();
+      const nextMonthKey = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}`;
+      const nextMonthName = nextDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+      state.pendingOverspendMonth = currentMonthKey;
+      state.pendingOverspendMonthName = currMonthName;
+      state.pendingOverspendAmount = currOverspend;
+      state.pendingTargetMonth = nextMonthKey;
+      state.pendingTargetMonthName = nextMonthName;
+
+      dom.overspendBannerTitle.textContent = `Current Month Over Budget`;
+      dom.overspendBannerDesc.textContent = `You are currently ${sym}${currOverspend.toFixed(2)} over budget this month (${sym}${currentMetrics.spent.toFixed(2)} spent of ${sym}${budget.toFixed(2)} limit). Roll this into an offset savings goal for ${nextMonthName}?`;
+      dom.rollOverspendBtnText.textContent = `Make ${nextMonthName} Goal (${sym}${currOverspend.toFixed(2)})`;
+      dom.overspendRecoveryBanner.classList.remove('hidden');
+      return;
+    }
+
+    // No active overspend to prompt
+    dom.overspendRecoveryBanner.classList.add('hidden');
+  }
+
+  function createOverspendRecoveryGoal(sourceMonthKey, sourceMonthName, amount, targetMonthKey, targetMonthName, isAuto = false) {
+    const cleanAmount = Math.round(amount * 100) / 100;
+    const sym = state.settings.currency;
+    const newGoal = {
+      id: 'goal_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      name: `Recoup ${sourceMonthName} Overspend`,
+      targetAmount: cleanAmount,
+      savedAmount: 0,
+      targetMonth: targetMonthKey,
+      color: '#F59E0B',
+      icon: 'dollar',
+      autoGeneratedFromOverspend: true,
+      overspentMonth: sourceMonthKey,
+      completed: false,
+      createdAt: new Date().toISOString()
+    };
+
+    if (!Array.isArray(state.savingsGoals)) {
+      state.savingsGoals = [];
+    }
+    state.savingsGoals.unshift(newGoal);
+    saveSavingsGoals();
+
+    if (dom.overspendRecoveryBanner) {
+      dom.overspendRecoveryBanner.classList.add('hidden');
+    }
+
+    renderSavingsGoals();
+
+    if (isAuto) {
+      showToast('Savings Goal Auto-Created', `Added ${sym}${cleanAmount.toFixed(2)} recovery goal for ${targetMonthName}`, 'dollar');
+    } else {
+      triggerHaptic(15);
+      showToast('Savings Goal Created', `Goal to recoup ${sym}${cleanAmount.toFixed(2)} added for ${targetMonthName}`, 'check');
+    }
+  }
+
+  function renderSavingsGoals(metrics) {
+    if (!dom.savingsGoalsList) return;
+
+    if (!metrics) {
+      metrics = getMonthSpendMetrics();
+    }
+
+    const goals = state.savingsGoals || [];
+    const sym = state.settings.currency;
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    // Summary calculations
+    let targetThisMonth = 0;
+    let savedTotal = 0;
+    let activeCount = 0;
+
+    goals.forEach(g => {
+      savedTotal += (g.savedAmount || 0);
+      if (g.targetMonth === currentMonthKey || g.targetMonth === 'all') {
+        targetThisMonth += (g.targetAmount || 0);
+      }
+      if (!g.completed && (g.savedAmount || 0) < g.targetAmount) {
+        activeCount++;
+      }
+    });
+
+    if (dom.activeGoalsCount) {
+      dom.activeGoalsCount.textContent = `${activeCount} active`;
+    }
+    if (dom.savingsTargetTotal) {
+      dom.savingsTargetTotal.textContent = `${sym}${targetThisMonth.toFixed(2)}`;
+    }
+    if (dom.savingsSavedTotal) {
+      dom.savingsSavedTotal.textContent = `${sym}${savedTotal.toFixed(2)}`;
+    }
+    if (dom.savingsMonthlySurplus) {
+      const netCash = metrics.netBalance;
+      const sign = netCash >= 0 ? '+' : '-';
+      dom.savingsMonthlySurplus.textContent = `${sign}${sym}${Math.abs(netCash).toFixed(2)}`;
+      dom.savingsMonthlySurplus.style.color = netCash >= 0 ? 'var(--primary-light)' : 'var(--accent-rose)';
+    }
+
+    if (goals.length === 0) {
+      dom.savingsGoalsList.innerHTML = '';
+      if (dom.savingsGoalsEmptyState) {
+        dom.savingsGoalsEmptyState.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (dom.savingsGoalsEmptyState) {
+      dom.savingsGoalsEmptyState.classList.add('hidden');
+    }
+
+    let html = '';
+    goals.forEach(goal => {
+      const saved = goal.savedAmount || 0;
+      const target = goal.targetAmount || 0;
+      const percent = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
+      const isComplete = goal.completed || (target > 0 && saved >= target);
+      const remaining = Math.max(0, target - saved);
+
+      let monthLabel = 'Ongoing';
+      if (goal.targetMonth && goal.targetMonth !== 'all') {
+        const parts = goal.targetMonth.split('-');
+        if (parts.length === 2) {
+          const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
+          monthLabel = d.toLocaleString('default', { month: 'short', year: 'numeric' });
+        }
+      }
+
+      const barBg = isComplete ? 'linear-gradient(90deg, #10B981, #34D399)' : (goal.color || '#10B981');
+
+      html += `
+        <div class="goal-item-card ${isComplete ? 'completed' : ''}" data-goal-id="${goal.id}">
+          <div class="goal-header">
+            <div class="goal-left">
+              <div class="goal-icon-box" style="background: ${goal.color || '#10B981'}20; color: ${goal.color || '#10B981'};">
+                ${getIconSvg(goal.icon || 'dollar')}
+              </div>
+              <div class="goal-title-col">
+                <div class="goal-name-row">
+                  <span class="goal-name">${escapeHtml(goal.name)}</span>
+                  ${goal.autoGeneratedFromOverspend ? '<span class="goal-overspend-tag">Overspend Recoup</span>' : ''}
+                </div>
+                <span class="goal-month-tag">${monthLabel}</span>
+              </div>
+            </div>
+            <div class="goal-right-metrics">
+              <span class="goal-amount-main">${sym}${saved.toFixed(2)}</span>
+              <span class="goal-amount-sub">of ${sym}${target.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div class="goal-progress-wrap">
+            <div class="goal-track">
+              <div class="goal-bar-fill" style="width: ${percent}%; background: ${barBg};"></div>
+            </div>
+            <div class="goal-meta-row">
+              <span class="goal-percent-txt" style="color: ${isComplete ? 'var(--primary-light)' : 'var(--text-main)'};">${percent}% saved</span>
+              <span class="goal-remaining-txt ${isComplete ? 'complete' : ''}">${isComplete ? 'Goal Achieved 🎉' : `${sym}${remaining.toFixed(2)} remaining`}</span>
+            </div>
+          </div>
+
+          <div class="goal-actions-bar">
+            <button type="button" class="goal-contribute-btn" data-action="contribute" data-goal-id="${goal.id}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>Contribute</span>
+            </button>
+            <div class="goal-manage-btns">
+              <button type="button" class="goal-icon-btn" data-action="edit" data-goal-id="${goal.id}" aria-label="Edit goal">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button type="button" class="goal-icon-btn delete" data-action="delete" data-goal-id="${goal.id}" aria-label="Delete goal">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    dom.savingsGoalsList.innerHTML = html;
+  }
+
+  // ============================================================================
   // RECURRING SUMMARY (History > Recurring sub-tab)
   // ============================================================================
   function renderRecurringSummary() {
@@ -1953,6 +2315,397 @@
   }
 
   // ============================================================================
+  // SAVINGS GOALS MANAGER & MODALS
+  // ============================================================================
+  function setupSavingsGoalsManager() {
+    if (!dom.savingsGoalModal) return;
+
+    // Helper: update active state on color picker buttons
+    function setActiveColor(color) {
+      state.newGoalColor = color;
+      if (dom.goalColorPickerRow) {
+        dom.goalColorPickerRow.querySelectorAll('.color-opt').forEach(btn => {
+          btn.classList.toggle('active', btn.getAttribute('data-color') === color);
+        });
+      }
+    }
+
+    // Helper: update active state on icon picker buttons
+    function setActiveIcon(icon) {
+      state.newGoalIcon = icon;
+      if (dom.goalIconPickerRow) {
+        dom.goalIconPickerRow.querySelectorAll('.icon-opt').forEach(btn => {
+          btn.classList.toggle('active', btn.getAttribute('data-icon') === icon);
+        });
+      }
+    }
+
+    // Color picker
+    if (dom.goalColorPickerRow) {
+      dom.goalColorPickerRow.querySelectorAll('.color-opt').forEach(btn => {
+        btn.addEventListener('click', () => {
+          triggerHaptic(10);
+          setActiveColor(btn.getAttribute('data-color'));
+        });
+      });
+    }
+
+    // Icon picker
+    if (dom.goalIconPickerRow) {
+      dom.goalIconPickerRow.querySelectorAll('.icon-opt').forEach(btn => {
+        btn.addEventListener('click', () => {
+          triggerHaptic(10);
+          setActiveIcon(btn.getAttribute('data-icon'));
+        });
+      });
+    }
+
+    // Target month select
+    if (dom.goalTargetMonthSelect) {
+      dom.goalTargetMonthSelect.addEventListener('change', () => {
+        if (dom.goalTargetMonthSelect.value === 'custom') {
+          dom.goalCustomMonthInput.classList.remove('hidden');
+          const now = new Date();
+          dom.goalCustomMonthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          dom.goalMonthDisplayHint.textContent = 'Custom target month selected';
+        } else {
+          dom.goalCustomMonthInput.classList.add('hidden');
+          if (dom.goalTargetMonthSelect.value === 'next') {
+            dom.goalMonthDisplayHint.textContent = 'Applies to next month budget recovery';
+          } else if (dom.goalTargetMonthSelect.value === 'all') {
+            dom.goalMonthDisplayHint.textContent = 'Continuous target across multiple months';
+          } else {
+            dom.goalMonthDisplayHint.textContent = 'Goal applies to current monthly budget calculations';
+          }
+        }
+      });
+    }
+
+    // Preset chips
+    if (dom.goalPresetChips) {
+      dom.goalPresetChips.querySelectorAll('.goal-preset-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          triggerHaptic(12);
+          const preset = chip.getAttribute('data-preset');
+          if (preset === 'recoup') {
+            const overspendAmt = state.pendingOverspendAmount > 0 ? state.pendingOverspendAmount : 150;
+            dom.goalNameInput.value = state.pendingOverspendMonthName ? `Recoup ${state.pendingOverspendMonthName} Overspend` : 'Recoup Overspend';
+            dom.goalTargetAmountInput.value = overspendAmt.toFixed(2);
+            setActiveColor('#F59E0B');
+            setActiveIcon('dollar');
+          } else if (preset === 'emergency') {
+            dom.goalNameInput.value = 'Emergency Buffer';
+            dom.goalTargetAmountInput.value = '500';
+            setActiveColor('#3B82F6');
+            setActiveIcon('activity');
+          } else if (preset === 'vacation') {
+            dom.goalNameInput.value = 'Vacation Fund';
+            dom.goalTargetAmountInput.value = '300';
+            setActiveColor('#EC4899');
+            setActiveIcon('gift');
+          } else if (preset === 'gadget') {
+            dom.goalNameInput.value = 'New Tech / Gadget';
+            dom.goalTargetAmountInput.value = '250';
+            setActiveColor('#8B5CF6');
+            setActiveIcon('box');
+          } else if (preset === 'rainy') {
+            dom.goalNameInput.value = 'Rainy Day Fund';
+            dom.goalTargetAmountInput.value = '200';
+            setActiveColor('#10B981');
+            setActiveIcon('star');
+          }
+        });
+      });
+    }
+
+    // Open Add Goal modal
+    const openAddModal = (goalToEdit = null) => {
+      triggerHaptic(15);
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+
+      if (goalToEdit) {
+        dom.savingsGoalModalTitle.textContent = 'Edit Savings Goal';
+        dom.editingGoalId.value = goalToEdit.id;
+        dom.goalNameInput.value = goalToEdit.name;
+        dom.goalTargetAmountInput.value = goalToEdit.targetAmount;
+        dom.goalSavedAmountInput.value = goalToEdit.savedAmount || 0;
+
+        if (goalToEdit.targetMonth === 'all') {
+          dom.goalTargetMonthSelect.value = 'all';
+          dom.goalCustomMonthInput.classList.add('hidden');
+        } else if (goalToEdit.targetMonth) {
+          const currentMonthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+          const nextDate = new Date(currentYear, currentMonth + 1, 1);
+          const nextMonthKey = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+
+          if (goalToEdit.targetMonth === currentMonthKey) {
+            dom.goalTargetMonthSelect.value = 'current';
+            dom.goalCustomMonthInput.classList.add('hidden');
+          } else if (goalToEdit.targetMonth === nextMonthKey) {
+            dom.goalTargetMonthSelect.value = 'next';
+            dom.goalCustomMonthInput.classList.add('hidden');
+          } else {
+            dom.goalTargetMonthSelect.value = 'custom';
+            dom.goalCustomMonthInput.value = goalToEdit.targetMonth;
+            dom.goalCustomMonthInput.classList.remove('hidden');
+          }
+        }
+        setActiveColor(goalToEdit.color || '#10B981');
+        setActiveIcon(goalToEdit.icon || 'dollar');
+      } else {
+        dom.savingsGoalModalTitle.textContent = 'New Savings Goal';
+        dom.editingGoalId.value = '';
+        dom.goalNameInput.value = '';
+        dom.goalTargetAmountInput.value = '';
+        dom.goalSavedAmountInput.value = '0';
+        dom.goalTargetMonthSelect.value = 'current';
+        dom.goalCustomMonthInput.classList.add('hidden');
+        dom.goalMonthDisplayHint.textContent = 'Goal applies to current monthly budget calculations';
+        setActiveColor('#10B981');
+        setActiveIcon('dollar');
+      }
+
+      dom.savingsGoalModal.classList.remove('hidden');
+      dom.goalNameInput.focus();
+    };
+
+    if (dom.openAddGoalBtn) {
+      dom.openAddGoalBtn.addEventListener('click', () => openAddModal());
+    }
+    if (dom.emptyAddGoalBtn) {
+      dom.emptyAddGoalBtn.addEventListener('click', () => openAddModal());
+    }
+
+    if (dom.closeSavingsGoalModalBtn) {
+      dom.closeSavingsGoalModalBtn.addEventListener('click', () => {
+        triggerHaptic(10);
+        dom.savingsGoalModal.classList.add('hidden');
+      });
+    }
+
+    // Save Savings Goal
+    if (dom.saveSavingsGoalBtn) {
+      dom.saveSavingsGoalBtn.addEventListener('click', () => {
+        const name = dom.goalNameInput.value.trim() || 'Savings Goal';
+        const targetAmount = parseFloat(dom.goalTargetAmountInput.value);
+
+        if (isNaN(targetAmount) || targetAmount <= 0) {
+          triggerHaptic(20);
+          showToast('Invalid Target', 'Please enter a target amount greater than 0', 'info');
+          dom.goalTargetAmountInput.focus();
+          return;
+        }
+
+        const savedAmount = Math.max(0, parseFloat(dom.goalSavedAmountInput.value) || 0);
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        let targetMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+
+        const selMonth = dom.goalTargetMonthSelect.value;
+        if (selMonth === 'next') {
+          const nextDate = new Date(currentYear, currentMonth + 1, 1);
+          targetMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+        } else if (selMonth === 'all') {
+          targetMonth = 'all';
+        } else if (selMonth === 'custom' && dom.goalCustomMonthInput.value) {
+          targetMonth = dom.goalCustomMonthInput.value;
+        }
+
+        const editId = dom.editingGoalId.value;
+        if (editId) {
+          const goal = (state.savingsGoals || []).find(g => g.id === editId);
+          if (goal) {
+            goal.name = name;
+            goal.targetAmount = parseFloat(targetAmount.toFixed(2));
+            goal.savedAmount = parseFloat(savedAmount.toFixed(2));
+            goal.targetMonth = targetMonth;
+            goal.color = state.newGoalColor || '#10B981';
+            goal.icon = state.newGoalIcon || 'dollar';
+            goal.completed = goal.savedAmount >= goal.targetAmount;
+          }
+          showToast('Goal Updated', `${name} updated successfully`, 'check');
+        } else {
+          const newGoal = {
+            id: 'goal_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            name,
+            targetAmount: parseFloat(targetAmount.toFixed(2)),
+            savedAmount: parseFloat(savedAmount.toFixed(2)),
+            targetMonth,
+            color: state.newGoalColor || '#10B981',
+            icon: state.newGoalIcon || 'dollar',
+            autoGeneratedFromOverspend: false,
+            completed: savedAmount >= targetAmount,
+            createdAt: new Date().toISOString()
+          };
+          if (!Array.isArray(state.savingsGoals)) {
+            state.savingsGoals = [];
+          }
+          state.savingsGoals.unshift(newGoal);
+          showToast('Goal Created', `Target: ${state.settings.currency}${targetAmount.toFixed(2)} for ${name}`, 'check');
+        }
+
+        triggerHaptic(15);
+        saveSavingsGoals();
+        dom.savingsGoalModal.classList.add('hidden');
+        renderSavingsGoals();
+      });
+    }
+
+    // Click delegation on goal cards (Contribute, Edit, Delete)
+    if (dom.savingsGoalsList) {
+      dom.savingsGoalsList.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const action = btn.getAttribute('data-action');
+        const goalId = btn.getAttribute('data-goal-id');
+        const goal = (state.savingsGoals || []).find(g => g.id === goalId);
+        if (!goal) return;
+
+        if (action === 'contribute') {
+          openContributeModal(goal);
+        } else if (action === 'edit') {
+          openAddModal(goal);
+        } else if (action === 'delete') {
+          triggerHaptic(20);
+          state.savingsGoals = state.savingsGoals.filter(g => g.id !== goalId);
+          saveSavingsGoals();
+          renderSavingsGoals();
+          showToast('Goal Removed', `Deleted ${goal.name}`, 'trash');
+        }
+      });
+    }
+
+    // Contribute Modal
+    function openContributeModal(goal) {
+      triggerHaptic(15);
+      state.contributingGoalId = goal.id;
+      const sym = state.settings.currency;
+
+      dom.contributeGoalName.textContent = goal.name;
+      dom.contributeCurrentSaved.textContent = `${sym}${(goal.savedAmount || 0).toFixed(2)}`;
+      dom.contributeTargetTotal.textContent = `${sym}${(goal.targetAmount || 0).toFixed(2)}`;
+      dom.contributeAmountInput.value = '';
+
+      // Update surplus chip text and value
+      const metrics = getMonthSpendMetrics();
+      const positiveSurplus = Math.max(0, metrics.netBalance);
+      if (dom.contributeSurplusChip) {
+        dom.contributeSurplusChip.textContent = `+Surplus (${sym}${positiveSurplus.toFixed(0)})`;
+        dom.contributeSurplusChip.setAttribute('data-add', positiveSurplus > 0 ? positiveSurplus.toFixed(2) : '50');
+      }
+
+      dom.goalContributeModal.classList.remove('hidden');
+      dom.contributeAmountInput.focus();
+    }
+
+    if (dom.closeContributeModalBtn) {
+      dom.closeContributeModalBtn.addEventListener('click', () => {
+        triggerHaptic(10);
+        dom.goalContributeModal.classList.add('hidden');
+      });
+    }
+
+    // Contribute Chips
+    if (dom.goalContributeModal) {
+      dom.goalContributeModal.querySelectorAll('.contribute-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          triggerHaptic(12);
+          const addVal = parseFloat(chip.getAttribute('data-add')) || 0;
+          const currentVal = parseFloat(dom.contributeAmountInput.value) || 0;
+          dom.contributeAmountInput.value = (currentVal + addVal).toFixed(2);
+        });
+      });
+    }
+
+    // Submit / Subtract Progress
+    function handleProgressDelta(isAdd) {
+      const goal = (state.savingsGoals || []).find(g => g.id === state.contributingGoalId);
+      if (!goal) return;
+
+      const amt = parseFloat(dom.contributeAmountInput.value);
+      if (isNaN(amt) || amt <= 0) {
+        triggerHaptic(20);
+        showToast('Invalid Amount', 'Please enter a valid contribution amount', 'info');
+        dom.contributeAmountInput.focus();
+        return;
+      }
+
+      triggerHaptic(15);
+      const currentSaved = goal.savedAmount || 0;
+      if (isAdd) {
+        goal.savedAmount = parseFloat((currentSaved + amt).toFixed(2));
+      } else {
+        goal.savedAmount = Math.max(0, parseFloat((currentSaved - amt).toFixed(2)));
+      }
+
+      goal.completed = goal.targetAmount > 0 && goal.savedAmount >= goal.targetAmount;
+      saveSavingsGoals();
+      dom.goalContributeModal.classList.add('hidden');
+      renderSavingsGoals();
+
+      const sym = state.settings.currency;
+      if (isAdd) {
+        if (goal.completed) {
+          showToast('Goal Achieved! 🎉', `Reached target for ${goal.name}!`, 'star');
+        } else {
+          showToast('Saved to Goal', `Added ${sym}${amt.toFixed(2)} to ${goal.name}`, 'check');
+        }
+      } else {
+        showToast('Goal Adjusted', `Subtracted ${sym}${amt.toFixed(2)} from ${goal.name}`, 'tag');
+      }
+    }
+
+    if (dom.submitGoalProgressBtn) {
+      dom.submitGoalProgressBtn.addEventListener('click', () => handleProgressDelta(true));
+    }
+    if (dom.subtractGoalProgressBtn) {
+      dom.subtractGoalProgressBtn.addEventListener('click', () => handleProgressDelta(false));
+    }
+
+    // Overspend Banner Actions
+    if (dom.rollOverspendGoalBtn) {
+      dom.rollOverspendGoalBtn.addEventListener('click', () => {
+        createOverspendRecoveryGoal(
+          state.pendingOverspendMonth,
+          state.pendingOverspendMonthName,
+          state.pendingOverspendAmount,
+          state.pendingTargetMonth,
+          state.pendingTargetMonthName,
+          false
+        );
+      });
+    }
+
+    if (dom.dismissOverspendBannerBtn) {
+      dom.dismissOverspendBannerBtn.addEventListener('click', () => {
+        triggerHaptic(12);
+        if (state.pendingOverspendMonth) {
+          if (!Array.isArray(state.dismissedOverspends)) {
+            state.dismissedOverspends = [];
+          }
+          state.dismissedOverspends.push(state.pendingOverspendMonth);
+          saveDismissedOverspends();
+        }
+        dom.overspendRecoveryBanner.classList.add('hidden');
+        showToast('Alert Dismissed', 'Overspend recovery dismissed for this month', 'info');
+      });
+    }
+
+    // Backdrop click dismiss for modals
+    [dom.savingsGoalModal, dom.goalContributeModal].forEach(modal => {
+      if (!modal) return;
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.classList.add('hidden');
+        }
+      });
+    });
+  }
+
+  // ============================================================================
   // SETTINGS & CATEGORY BUDGET LIMITS LIST
   // ============================================================================
   function renderCategoryLimitsEditor() {
@@ -2001,6 +2754,9 @@
     dom.currencySelect.value = state.settings.currency;
     dom.currencySymbol.textContent = state.entryMode === 'income' ? '+' + state.settings.currency : state.settings.currency;
     dom.hapticsToggle.checked = state.settings.haptics !== false;
+    if (dom.autoRollOverspendToggle) {
+      dom.autoRollOverspendToggle.checked = state.settings.autoRollOverspend !== false;
+    }
     dom.sheetsWebhookInput.value = state.settings.sheetsUrl || '';
 
     renderCategoryLimitsEditor();
@@ -2023,6 +2779,9 @@
 
     state.settings.currency = dom.currencySelect.value;
     state.settings.haptics = dom.hapticsToggle.checked;
+    if (dom.autoRollOverspendToggle) {
+      state.settings.autoRollOverspend = dom.autoRollOverspendToggle.checked;
+    }
     dom.currencySymbol.textContent = state.entryMode === 'income' ? '+' + state.settings.currency : state.settings.currency;
 
     saveSettings();
@@ -2646,7 +3405,8 @@
       settings: state.settings,
       categories: state.categories,
       recurringRules: state.recurringRules,
-      transactions: state.transactions
+      transactions: state.transactions,
+      savingsGoals: state.savingsGoals || []
     };
 
     const jsonString = JSON.stringify(backupData, null, 2);
@@ -2679,6 +3439,10 @@
         if (Array.isArray(imported.recurringRules)) {
           state.recurringRules = imported.recurringRules;
           saveRecurringRules();
+        }
+        if (Array.isArray(imported.savingsGoals)) {
+          state.savingsGoals = imported.savingsGoals;
+          saveSavingsGoals();
         }
         if (Array.isArray(imported.categories)) {
           state.categories = imported.categories.map(c => {
@@ -2878,6 +3642,9 @@
     dom.monthlyBudgetInput.addEventListener('input', triggerAutoSave);
     dom.currencySelect.addEventListener('change', () => saveGeneralSettings(false, 30));
     dom.hapticsToggle.addEventListener('change', () => saveGeneralSettings(false, 30));
+    if (dom.autoRollOverspendToggle) {
+      dom.autoRollOverspendToggle.addEventListener('change', () => saveGeneralSettings(false, 30));
+    }
 
     window.addEventListener('beforeunload', () => {
       flushPendingSettingsSync();
@@ -3075,6 +3842,7 @@
     setupRecurringManager();
     setupHistorySubTabs();
     setupEditTransactionModal();
+    setupSavingsGoalsManager();
     renderRecurringList();
     renderRecurringSummary();
     checkAndProcessRecurring();
@@ -3096,5 +3864,7 @@
   } else {
     init();
   }
+
+  window.__budgie = { state, dom, renderAnalytics, checkMonthOverspends, getMonthSpendMetrics, createOverspendRecoveryGoal };
 
 })();
