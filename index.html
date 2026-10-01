@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="index.css?v=10">
+  <link rel="stylesheet" href="index.css?v=12">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -157,14 +157,14 @@
             <!-- Quick Budget Gauge Pill (Moved Down Low) -->
             <div class="budget-glance-card" id="budgetGlanceCard">
               <div class="glance-info">
-                <span class="glance-label">Monthly Left</span>
+                <span class="glance-label">Left to spend</span>
                 <span class="glance-val" id="glanceRemaining">$1,250.00</span>
               </div>
               <div class="glance-track">
                 <div class="glance-fill" id="glanceFill" style="width: 35%;"></div>
               </div>
               <div class="glance-sub" id="glanceDailySafe">
-                Safe to spend: <strong id="glanceDailyAmount">$45.00/day</strong>
+                Daily available: <strong id="glanceDailyAmount">$45.00/day</strong>
               </div>
             </div>
 
@@ -257,7 +257,7 @@
         <!-- Sub-Tab Toggle: Transactions | Recurring -->
         <div class="history-subtab-bar" role="tablist" aria-label="History Sub-Tabs">
           <button type="button" class="history-subtab active" id="subtabTransactions" data-subtab="transactions" role="tab" aria-selected="true">Transactions</button>
-          <button type="button" class="history-subtab" id="subtabRecurring" data-subtab="recurring" role="tab" aria-selected="false">Recurring</button>
+          <button type="button" class="history-subtab" id="subtabRecurring" data-subtab="recurring" role="tab" aria-selected="false">Bills &amp; Paychecks</button>
         </div>
 
         <!-- SUB-VIEW: Transactions -->
@@ -307,9 +307,9 @@
         <div id="historySubviewRecurring" class="history-subview">
           <div class="section-title-row" style="margin-bottom: 8px;">
             <div>
-              <p class="settings-desc" style="margin: 0;">Auto-adds on schedule (Rent, Netflix, Gym, Paychecks).</p>
+              <p class="settings-desc" style="margin: 0;">Scheduled bills and paychecks. These come out of the month automatically — not a second budget list.</p>
             </div>
-            <button type="button" id="openAddRecurringBtn" class="action-btn secondary-btn" style="padding: 6px 12px; font-size: 0.78rem;">+ Add Rule</button>
+            <button type="button" id="openAddRecurringBtn" class="action-btn secondary-btn" style="padding: 6px 12px; font-size: 0.78rem;">+ Add</button>
           </div>
 
           <!-- Monthly Recurring Commitment Summary -->
@@ -354,8 +354,9 @@
           <span class="card-caption">Monthly Cash Flow</span>
           <div class="cashflow-grid">
             <div class="cashflow-item income-item">
-              <span class="cashflow-label">Total Income</span>
+              <span class="cashflow-label">Projected Income</span>
               <span class="cashflow-value" id="analyticsTotalIncome">+$0.00</span>
+              <span class="cashflow-hint" id="analyticsIncomeHint">Received $0.00 of $0.00 expected</span>
             </div>
             <div class="cashflow-item expense-item">
               <span class="cashflow-label">Total Spent</span>
@@ -367,7 +368,7 @@
             </div>
           </div>
           <div class="cashflow-sub-row" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-subtle); font-size: 0.8rem; color: var(--text-muted);">
-            <span>Recurring Bills Commitment:</span>
+            <span>Bills held this month:</span>
             <strong id="analyticsRecurringTotal" style="color: var(--text-primary); font-family: var(--font-display);">$0.00/mo</strong>
           </div>
         </div>
@@ -376,10 +377,10 @@
         <div class="analytics-card budget-meter-card">
           <div class="budget-meter-header">
             <div>
-              <span class="card-caption">Overall Budget Status</span>
+              <span class="card-caption">Daily pot (from income)</span>
               <div class="budget-main-numbers">
                 <span class="spent-number" id="analyticsSpent">$0.00</span>
-                <span class="limit-caption" id="analyticsBudgetLimit">of $2,000.00 total limit</span>
+                <span class="limit-caption" id="analyticsBudgetLimit">of $0.00 daily pot</span>
               </div>
             </div>
             <div class="budget-percentage-badge" id="budgetPercentageBadge">0%</div>
@@ -398,7 +399,7 @@
             </div>
             <div class="pace-divider"></div>
             <div class="pace-item">
-              <span class="pace-label">Safe Pace</span>
+              <span class="pace-label">Daily available</span>
               <span class="pace-val highlight" id="analyticsDailyPace">$66.60 / day</span>
             </div>
             <div class="pace-divider"></div>
@@ -408,19 +409,7 @@
             </div>
           </div>
 
-          <!-- Remaining After Bills -->
-          <div class="after-bills-container">
-            <div class="pace-divider"></div>
-            <div class="pace-item after-bills-item">
-              <span class="pace-label">After Upcoming Bills</span>
-              <span class="pace-val" id="analyticsAfterBills">$0.00</span>
-            </div>
-            <div class="pace-divider"></div>
-            <div class="pace-item after-bills-item">
-              <span class="pace-label">True Daily Pace</span>
-              <span class="pace-val highlight" id="analyticsTrueDailyPace">$0.00 / day</span>
-            </div>
-          </div>
+          <div class="budget-waterfall" id="budgetWaterfall"></div>
         </div>
 
         <!-- Budget Overspend Recovery Banner (Dynamic) -->
@@ -512,7 +501,7 @@
         <!-- Per-Category Budget Limits Card -->
         <div class="analytics-card">
           <div class="section-title-row" style="margin-bottom: 12px;">
-            <h3 class="card-subtitle" style="margin-bottom: 0;">Category Budget Limits</h3>
+            <h3 class="card-subtitle" style="margin-bottom: 0;">Category tracking</h3>
             <button type="button" class="text-link-btn" id="editBudgetsLinkBtn">Edit Limits</button>
           </div>
           <div class="category-budget-meters" id="categoryBudgetMeters">
@@ -625,18 +614,18 @@
 
         <!-- Budget & Currency Preferences -->
         <div class="settings-card">
-          <h3 class="settings-title">Income & Budget Preferences</h3>
+          <h3 class="settings-title">Income &amp; Budget Preferences</h3>
           
-          <div class="form-row">
-            <div class="form-group flex-1">
-              <label for="monthlyIncomeInput" class="form-label">Expected Income ($)</label>
-              <input type="number" id="monthlyIncomeInput" class="form-input" min="0" step="100" value="3500">
-            </div>
+          <div class="form-group">
+            <label for="monthlyIncomeInput" class="form-label">Expected Income ($)</label>
+            <input type="number" id="monthlyIncomeInput" class="form-input" min="0" step="100" value="3500">
+            <span class="field-hint" id="paycheckIncomeHint">Add a paycheck under History → Bills &amp; Paychecks so income is scheduled even before it posts.</span>
+          </div>
 
-            <div class="form-group flex-1">
-              <label for="monthlyBudgetInput" class="form-label">Monthly Budget ($)</label>
-              <input type="number" id="monthlyBudgetInput" class="form-input" min="1" step="50" value="2000">
-            </div>
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label">Spendable this month</label>
+            <div id="derivedBudgetDisplay" class="derived-budget-display">$0.00</div>
+            <span class="field-hint">Income minus savings, bills, and gas leftover. This is not a second cap you set.</span>
           </div>
 
           <div class="form-group" style="margin-top: 10px;">
@@ -684,7 +673,7 @@
           <div class="section-title-row" style="margin-bottom: 8px;">
             <div>
               <h3 class="settings-title">Category Monthly Budgets</h3>
-              <p class="settings-desc">Set monthly spending limits for Groceries, Gas, Misc, and more.</p>
+              <p class="settings-desc">Limits for tracking. Turn on “Hold from daily” for planned costs like Gas and Bills. Groceries and food stay as daily / fun money.</p>
             </div>
             <button type="button" id="openAddCategoryFromSettingsBtn" class="action-btn secondary-btn" style="padding: 6px 12px; font-size: 0.78rem;">+ New Category</button>
           </div>
@@ -694,7 +683,7 @@
           </div>
         </div>
 
-        <!-- Note: Recurring Bills & Subscriptions have moved to History > Recurring tab -->
+        <!-- Note: Bills &amp; Paychecks live in History -->
 
         <!-- Data Backup & CSV Export -->
         <div class="settings-card">
@@ -956,7 +945,7 @@
         </div>
         <div class="modal-footer">
           <input type="hidden" id="editingRecurId" value="">
-          <button type="button" id="saveRecurringRuleBtn" class="action-btn primary-btn">Save Recurring Rule</button>
+          <button type="button" id="saveRecurringRuleBtn" class="action-btn primary-btn">Save</button>
         </div>
       </div>
     </div>
@@ -1067,7 +1056,13 @@
               </select>
               <input type="month" id="goalCustomMonthInput" class="form-input flex-1 hidden">
             </div>
-            <span class="field-hint" id="goalMonthDisplayHint">Goal applies to current monthly budget calculations</span>
+            <span class="field-hint" id="goalMonthDisplayHint">Unfilled amount is held back from this month's daily spend</span>
+          </div>
+
+          <div class="form-group hidden" id="goalMonthlyContributionGroup">
+            <label for="goalMonthlyContributionInput" class="form-label">Monthly amount to reserve ($)</label>
+            <input type="number" id="goalMonthlyContributionInput" class="form-input" min="0" step="10" value="0" placeholder="0.00">
+            <span class="field-hint">Held back from this month's daily spend. Leave 0 so a large ongoing total does not wipe the month.</span>
           </div>
 
           <!-- Color & Accent Picker -->
@@ -1144,6 +1139,6 @@
 
   </div>
 
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>

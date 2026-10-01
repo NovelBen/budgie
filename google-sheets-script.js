@@ -136,7 +136,7 @@ function doPost(e) {
       var setRows = [
         ["Setting", "Value", "Notes", ""],
         ["Expected Monthly Income", incomeVal, "Monthly baseline income", ""],
-        ["Overall Monthly Budget", budgetVal, "Monthly spending limit", ""],
+        ["Overall Monthly Budget", budgetVal, "Derived daily pot (income minus holds)", ""],
         ["Currency Symbol", String(data.settings && data.settings.currency || "$"), "Display currency", ""],
         ["Haptic Feedback", String(data.settings && data.settings.haptics !== false), "Vibration preference", ""],
         ["Last Updated", Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"), "Auto-synced from Budgie", ""],

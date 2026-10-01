@@ -76,14 +76,89 @@
     { id: 'income_misc', name: 'Misc Income', icon: 'tag', color: '#8B5CF6' }
   ];
 
+  const DEFAULT_RESERVED_CATEGORY_IDS = ['gas', 'bills'];
+
   const DEFAULT_SETTINGS = {
     expectedIncome: 3500,
     monthlyBudget: 2000,
     currency: '$',
     sheetsUrl: '',
     haptics: true,
-    autoRollOverspend: true
+    autoRollOverspend: true,
+    reservedCategoryIds: [...DEFAULT_RESERVED_CATEGORY_IDS]
   };
+
+  // ============================================================================
+  // LOCAL CALENDAR-DATE HELPERS (avoid UTC parsing of YYYY-MM-DD)
+  // ============================================================================
+  function localDateStr(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function parseLocalDate(dateStr) {
+    if (!dateStr) return new Date();
+    const datePart = String(dateStr).slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+      const [y, m, d] = datePart.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+    const parsed = new Date(dateStr);
+    return isNaN(parsed.getTime()) ? new Date() : parsed;
+  }
+
+  function currentMonthKey(d = new Date()) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function lastDateOfMonthStr(year, monthIndex) {
+    return localDateStr(new Date(year, monthIndex + 1, 0));
+  }
+
+  function firstDateOfMonthStr(year, monthIndex) {
+    return localDateStr(new Date(year, monthIndex, 1));
+  }
+
+  function getReservedCategoryIds() {
+    const stored = state.settings && state.settings.reservedCategoryIds;
+    if (Array.isArray(stored) && stored.length > 0) {
+      return stored.slice();
+    }
+    return DEFAULT_RESERVED_CATEGORY_IDS.slice();
+  }
+
+  function isCategoryReserved(cat) {
+    if (!cat) return false;
+    const ids = getReservedCategoryIds();
+    if (ids.includes(cat.id)) return true;
+    const name = (cat.name || '').toLowerCase();
+    if (ids.includes('gas') && (cat.id === 'gas' || name === 'gas' || name.includes('gas'))) {
+      return true;
+    }
+    if (ids.includes('bills') && (cat.id === 'bills' || name.includes('bill'))) {
+      return true;
+    }
+    return false;
+  }
+
+  function isTxReservedExpense(tx) {
+    if (!tx || tx.type === 'income') return false;
+    const cat = (state.categories || []).find(c => c.id === tx.categoryId || c.name === tx.category);
+    if (cat) return isCategoryReserved(cat);
+    const ids = getReservedCategoryIds();
+    if (ids.includes(tx.categoryId)) return true;
+    const name = (tx.category || '').toLowerCase();
+    if (ids.includes('gas') && name.includes('gas')) return true;
+    if (ids.includes('bills') && name.includes('bill')) return true;
+    return false;
+  }
+
+  function findCategoryForRule(rule) {
+    if (!rule) return null;
+    return (state.categories || []).find(c => c.id === rule.categoryId || c.name === rule.category) || null;
+  }
 
   const DEMO_TRANSACTIONS = [
     {
@@ -94,7 +169,7 @@
       categoryId: 'paycheck',
       note: 'Bi-weekly Direct Deposit',
       method: 'Bank',
-      date: new Date().toISOString().split('T')[0],
+      date: localDateStr(),
       createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
       synced: true
     },
@@ -106,7 +181,7 @@
       categoryId: 'groceries',
       note: 'Trader Joe’s groceries',
       method: 'Card',
-      date: new Date().toISOString().split('T')[0],
+      date: localDateStr(),
       createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
       synced: true
     },
@@ -118,7 +193,7 @@
       categoryId: 'gas',
       note: 'Shell fuel fill-up',
       method: 'Card',
-      date: new Date().toISOString().split('T')[0],
+      date: localDateStr(),
       createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
       synced: true
     },
@@ -130,7 +205,7 @@
       categoryId: 'misc',
       note: 'Home essentials',
       method: 'Card',
-      date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+      date: localDateStr(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() - 1)),
       createdAt: new Date(Date.now() - 86400000).toISOString(),
       synced: true
     },
@@ -142,7 +217,7 @@
       categoryId: 'food',
       note: 'Chipotle Lunch',
       method: 'Card',
-      date: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0],
+      date: localDateStr(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() - 2)),
       createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
       synced: true
     }
@@ -330,6 +405,12 @@
     dom.upcomingBillsCount = document.getElementById('upcomingBillsCount');
     dom.analyticsAfterBills = document.getElementById('analyticsAfterBills');
     dom.analyticsTrueDailyPace = document.getElementById('analyticsTrueDailyPace');
+    dom.analyticsIncomeHint = document.getElementById('analyticsIncomeHint');
+    dom.budgetWaterfall = document.getElementById('budgetWaterfall');
+    dom.paycheckIncomeHint = document.getElementById('paycheckIncomeHint');
+    dom.derivedBudgetDisplay = document.getElementById('derivedBudgetDisplay');
+    dom.goalMonthlyContributionGroup = document.getElementById('goalMonthlyContributionGroup');
+    dom.goalMonthlyContributionInput = document.getElementById('goalMonthlyContributionInput');
 
     // Overspend Recovery Banner & Savings Goals
     dom.overspendRecoveryBanner = document.getElementById('overspendRecoveryBanner');
@@ -400,7 +481,11 @@
     try {
       const storedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
       if (storedSettings) {
-        state.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) };
+        const parsedSettings = JSON.parse(storedSettings);
+        state.settings = { ...DEFAULT_SETTINGS, ...parsedSettings };
+        if (!Object.prototype.hasOwnProperty.call(parsedSettings, 'reservedCategoryIds')) {
+          state.settings.reservedCategoryIds = [...DEFAULT_RESERVED_CATEGORY_IDS];
+        }
       }
 
       const storedCategories = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
@@ -707,7 +792,7 @@
     const activeList = isIncome ? state.incomeCategories : state.categories;
     const categoryObj = activeList.find(c => c.id === state.selectedCategoryId) || activeList[0];
     const note = dom.expenseNoteInput.value.trim();
-    const date = dom.expenseDateInput.value || new Date().toISOString().split('T')[0];
+    const date = dom.expenseDateInput.value || localDateStr();
     const now = new Date();
 
     const newTx = {
@@ -1016,6 +1101,7 @@
         targetAmount: g.targetAmount,
         savedAmount: g.savedAmount,
         targetMonth: g.targetMonth,
+        monthlyContribution: g.monthlyContribution || 0,
         completed: g.completed,
         autoGeneratedFromOverspend: g.autoGeneratedFromOverspend
       }))
@@ -1040,15 +1126,11 @@
         const remote = data.settings;
         let hasChanges = false;
 
-        const isLocalDefault = (state.settings.expectedIncome === 3500 && state.settings.monthlyBudget === 2000);
+        const isLocalDefault = (state.settings.expectedIncome === 3500);
 
         if ((force || isLocalDefault) && remote.settings) {
           if (typeof remote.settings.expectedIncome === 'number') {
             state.settings.expectedIncome = remote.settings.expectedIncome;
-            hasChanges = true;
-          }
-          if (typeof remote.settings.monthlyBudget === 'number') {
-            state.settings.monthlyBudget = remote.settings.monthlyBudget;
             hasChanges = true;
           }
           if (remote.settings.currency) {
@@ -1245,78 +1327,274 @@
 
   // ============================================================================
   // BUDGET & ANALYTICS CALCULATIONS
+  // One story: projected income minus savings, bills, and reserved leftover
+  // (gas/bills by default) equals daily / fun spend.
   // ============================================================================
-  function getMonthSpendMetrics() {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
+  function isRecurringPostedOnDate(rule, dateStr) {
+    if (!rule || !dateStr) return false;
+    const target = String(dateStr).slice(0, 10);
+    return (state.transactions || []).some(tx => {
+      const txDate = String(tx.date || '').slice(0, 10);
+      if (txDate !== target) return false;
+      if (tx.note && tx.note.includes(rule.title) && tx.note.includes('(Recurring)')) {
+        return true;
+      }
+      return false;
+    });
+  }
 
-    let totalMonthSpent = 0;
-    let totalMonthIncome = 0;
-    const categoryTotals = {};
-    const methodTotals = {};
+  function getUncommittedRecurringForMonth(year, monthIndex) {
+    const monthStart = firstDateOfMonthStr(year, monthIndex);
+    const monthEnd = lastDateOfMonthStr(year, monthIndex);
+    let totalExpense = 0;
+    let totalIncome = 0;
+    const items = [];
+    const expenseByCategoryId = {};
 
-    state.transactions.forEach(tx => {
-      const txDate = new Date(tx.date || tx.createdAt);
-      if (txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth) {
-        if (tx.type === 'income') {
-          totalMonthIncome += tx.amount;
-        } else {
-          totalMonthSpent += tx.amount;
-          categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + tx.amount;
-          methodTotals[tx.method || 'Card'] = (methodTotals[tx.method || 'Card'] || 0) + tx.amount;
+    (state.recurringRules || []).forEach(rule => {
+      if (!rule.active) return;
+
+      let nextDate = rule.nextDueDate;
+      if (!nextDate) return;
+
+      let safetyLimit = 0;
+      while (nextDate <= monthEnd && safetyLimit < 62) {
+        safetyLimit++;
+        if (nextDate >= monthStart) {
+          const isPosted = isRecurringPostedOnDate(rule, nextDate);
+          const itemType = rule.type || 'expense';
+          items.push({
+            title: rule.title,
+            amount: rule.amount,
+            type: itemType,
+            date: nextDate,
+            frequency: rule.frequency,
+            categoryId: rule.categoryId,
+            posted: isPosted
+          });
+
+          if (!isPosted) {
+            if (itemType === 'income') {
+              totalIncome += rule.amount;
+            } else {
+              totalExpense += rule.amount;
+              const catId = rule.categoryId || '';
+              expenseByCategoryId[catId] = (expenseByCategoryId[catId] || 0) + rule.amount;
+            }
+          }
         }
+        const prevDate = nextDate;
+        nextDate = getNextOccurrence(nextDate, rule.frequency);
+        if (!nextDate || nextDate <= prevDate) break;
       }
     });
 
-    const budget = state.settings.monthlyBudget || 2000;
-    const remaining = Math.max(0, budget - totalMonthSpent);
-    const percentSpent = budget > 0 ? Math.min(100, (totalMonthSpent / budget) * 100) : 0;
-    const netBalance = totalMonthIncome - totalMonthSpent;
+    items.sort((a, b) => a.date.localeCompare(b.date));
+    return { items, totalExpense, totalIncome, expenseByCategoryId };
+  }
 
-    const totalDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const dayOfMonth = now.getDate();
-    const daysLeft = Math.max(1, totalDaysInMonth - dayOfMonth + 1);
-    const dailySafeSpend = remaining / daysLeft;
+  function getUncommittedRecurringThisMonth() {
+    const now = new Date();
+    return getUncommittedRecurringForMonth(now.getFullYear(), now.getMonth());
+  }
+
+  function getMonthlyRecurringIncomeEquivalent() {
+    let monthlyIncome = 0;
+    (state.recurringRules || []).forEach(r => {
+      if (!r.active || r.type !== 'income') return;
+      let monthlyEquiv = r.amount;
+      if (r.frequency === 'weekly') monthlyEquiv = r.amount * 4;
+      else if (r.frequency === 'biweekly') monthlyEquiv = r.amount * 2;
+      else if (r.frequency === 'semimonthly') monthlyEquiv = r.amount * 2;
+      else if (r.frequency === 'yearly') monthlyEquiv = r.amount / 12;
+      monthlyIncome += monthlyEquiv;
+    });
+    return monthlyIncome;
+  }
+
+  function getSavingsReservedForMonth(monthKey) {
+    let reserved = 0;
+    (state.savingsGoals || []).forEach(g => {
+      if (!g || g.completed) return;
+      const target = g.targetAmount || 0;
+      const saved = g.savedAmount || 0;
+      const remaining = Math.max(0, target - saved);
+      if (remaining <= 0) return;
+
+      if (g.targetMonth === monthKey) {
+        reserved += remaining;
+      } else if (g.targetMonth === 'all') {
+        const monthly = typeof g.monthlyContribution === 'number' ? g.monthlyContribution : 0;
+        reserved += Math.max(0, monthly);
+      }
+    });
+    return reserved;
+  }
+
+  function persistDerivedMonthlyBudget(funBudget) {
+    const rounded = Math.round(Math.max(0, funBudget) * 100) / 100;
+    if (state.settings.monthlyBudget !== rounded) {
+      state.settings.monthlyBudget = rounded;
+      saveSettings();
+    }
+  }
+
+  function getMonthBudgetModel(refDate = new Date()) {
+    const year = refDate.getFullYear();
+    const month = refDate.getMonth();
+    const monthKey = currentMonthKey(refDate);
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+
+    let totalMonthSpent = 0;
+    let receivedIncome = 0;
+    let funSpent = 0;
+    let reservedSpent = 0;
+    const categoryTotals = {};
+    const categoryTotalsById = {};
+    const methodTotals = {};
+    const reservedSpentById = {};
+
+    (state.transactions || []).forEach(tx => {
+      const txDate = parseLocalDate(tx.date || tx.createdAt);
+      if (txDate.getFullYear() !== year || txDate.getMonth() !== month) return;
+
+      if (tx.type === 'income') {
+        receivedIncome += tx.amount;
+        return;
+      }
+
+      totalMonthSpent += tx.amount;
+      categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + tx.amount;
+      if (tx.categoryId) {
+        categoryTotalsById[tx.categoryId] = (categoryTotalsById[tx.categoryId] || 0) + tx.amount;
+      }
+      methodTotals[tx.method || 'Card'] = (methodTotals[tx.method || 'Card'] || 0) + tx.amount;
+
+      if (isTxReservedExpense(tx)) {
+        reservedSpent += tx.amount;
+        const cat = (state.categories || []).find(c => c.id === tx.categoryId || c.name === tx.category);
+        const catId = cat ? cat.id : (tx.categoryId || tx.category);
+        reservedSpentById[catId] = (reservedSpentById[catId] || 0) + tx.amount;
+      } else {
+        funSpent += tx.amount;
+      }
+    });
+
+    const uncommitted = getUncommittedRecurringForMonth(year, month);
+    const scheduledIncome = uncommitted.totalIncome;
+    const unpostedRecurringExpenses = uncommitted.totalExpense;
+    const expectedIncome = parseFloat(state.settings.expectedIncome) || 0;
+    const projectedIncome = Math.max(receivedIncome + scheduledIncome, expectedIncome);
+
+    const savingsReserved = getSavingsReservedForMonth(monthKey);
+
+    const reservedBreakdown = [];
+    let leftoverReserved = 0;
+    (state.categories || []).forEach(cat => {
+      if (!isCategoryReserved(cat)) return;
+      const spent = (categoryTotalsById[cat.id] || categoryTotals[cat.name] || 0);
+      const unpostedInCat = uncommitted.expenseByCategoryId[cat.id] || 0;
+      const limit = cat.budgetLimit || 0;
+      const leftover = Math.max(0, limit - spent - unpostedInCat);
+      leftoverReserved += leftover;
+      reservedBreakdown.push({
+        id: cat.id,
+        name: cat.name,
+        color: cat.color,
+        spent,
+        limit,
+        leftover,
+        unposted: unpostedInCat
+      });
+    });
+
+    const billsReserved = unpostedRecurringExpenses + leftoverReserved;
+    const availableRaw = projectedIncome - savingsReserved - unpostedRecurringExpenses - leftoverReserved - funSpent - reservedSpent;
+    const remaining = Math.max(0, availableRaw);
+    const displayBudgetFinal = Math.max(0, projectedIncome - savingsReserved - unpostedRecurringExpenses - leftoverReserved - reservedSpent);
+    const percentSpent = displayBudgetFinal > 0 ? Math.min(100, (funSpent / displayBudgetFinal) * 100) : (funSpent > 0 ? 100 : 0);
+
+    const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+    const dayOfMonth = isCurrentMonth ? today.getDate() : totalDaysInMonth;
+    const daysLeft = isCurrentMonth ? Math.max(1, totalDaysInMonth - dayOfMonth + 1) : 1;
+    const dailySafeSpend = daysLeft > 0 ? remaining / daysLeft : 0;
+
+    const netBalance = receivedIncome - totalMonthSpent;
+
+    if (isCurrentMonth) {
+      persistDerivedMonthlyBudget(displayBudgetFinal);
+    }
 
     return {
       spent: totalMonthSpent,
-      income: totalMonthIncome,
-      netBalance: netBalance,
-      budget: budget,
-      remaining: remaining,
-      percentSpent: percentSpent,
-      daysLeft: daysLeft,
-      dailySafeSpend: dailySafeSpend,
-      categoryTotals: categoryTotals,
-      methodTotals: methodTotals
+      funSpent,
+      reservedSpent,
+      income: projectedIncome,
+      receivedIncome,
+      scheduledIncome,
+      expectedIncome,
+      paycheckEquivalent: getMonthlyRecurringIncomeEquivalent(),
+      netBalance,
+      budget: displayBudgetFinal,
+      remaining,
+      availableRaw,
+      percentSpent,
+      daysLeft,
+      dailySafeSpend,
+      categoryTotals,
+      categoryTotalsById,
+      methodTotals,
+      savingsReserved,
+      unpostedRecurringExpenses,
+      leftoverReserved,
+      reservedBreakdown,
+      billsReserved,
+      projectedIncome,
+      monthKey
     };
   }
 
+  function getMonthSpendMetrics() {
+    return getMonthBudgetModel(new Date());
+  }
+
   function renderGlanceBar() {
-    const metrics = getMonthSpendMetrics();
+    const metrics = getMonthBudgetModel();
     const sym = state.settings.currency;
 
-    dom.glanceRemaining.textContent = `${sym}${metrics.remaining.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    dom.glanceFill.style.width = `${Math.min(100, metrics.percentSpent)}%`;
-
-    if (metrics.percentSpent > 90) {
-      dom.glanceFill.style.background = 'linear-gradient(90deg, #F43F5E, #E11D48)';
-      dom.glanceRemaining.style.color = '#F43F5E';
-    } else if (metrics.percentSpent > 75) {
-      dom.glanceFill.style.background = 'linear-gradient(90deg, #F59E0B, #D97706)';
-      dom.glanceRemaining.style.color = '#F59E0B';
-    } else {
-      dom.glanceFill.style.background = 'linear-gradient(90deg, #10B981, #34D399)';
-      dom.glanceRemaining.style.color = '#34D399';
+    if (dom.glanceRemaining) {
+      dom.glanceRemaining.textContent = `${sym}${metrics.remaining.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    if (dom.glanceFill) {
+      dom.glanceFill.style.width = `${Math.min(100, metrics.percentSpent)}%`;
+      if (metrics.percentSpent > 90 || metrics.availableRaw < 0) {
+        dom.glanceFill.style.background = 'linear-gradient(90deg, #F43F5E, #E11D48)';
+        if (dom.glanceRemaining) dom.glanceRemaining.style.color = '#F43F5E';
+      } else if (metrics.percentSpent > 75) {
+        dom.glanceFill.style.background = 'linear-gradient(90deg, #F59E0B, #D97706)';
+        if (dom.glanceRemaining) dom.glanceRemaining.style.color = '#F59E0B';
+      } else {
+        dom.glanceFill.style.background = 'linear-gradient(90deg, #10B981, #34D399)';
+        if (dom.glanceRemaining) dom.glanceRemaining.style.color = '#34D399';
+      }
     }
 
-    // Factor in upcoming uncommitted bills for true daily safe-to-spend
-    const uncommitted = getUncommittedRecurringThisMonth();
-    const trueRemaining = Math.max(0, metrics.remaining - uncommitted.totalExpense);
-    const trueDailySafe = metrics.daysLeft > 0 ? trueRemaining / metrics.daysLeft : 0;
+    if (dom.glanceDailyAmount) {
+      dom.glanceDailyAmount.textContent = `${sym}${metrics.dailySafeSpend.toFixed(2)}/day`;
+    }
 
-    dom.glanceDailyAmount.textContent = `${sym}${trueDailySafe.toFixed(2)}/day`;
+    if (dom.derivedBudgetDisplay) {
+      dom.derivedBudgetDisplay.textContent = `${sym}${metrics.budget.toFixed(2)}`;
+    }
+    if (dom.paycheckIncomeHint) {
+      const pay = metrics.paycheckEquivalent;
+      if (pay > 0) {
+        dom.paycheckIncomeHint.textContent = `From paychecks: ${sym}${pay.toFixed(2)}/mo (used if higher than expected, together with logged income).`;
+      } else {
+        dom.paycheckIncomeHint.textContent = 'Add a paycheck under History → Bills & Paychecks so income is scheduled even before it posts.';
+      }
+    }
   }
 
   function updateTopMonthHeader() {
@@ -1362,8 +1640,10 @@
 
     const sortedDates = Object.keys(groups).sort((a, b) => new Date(b) - new Date(a));
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const todayStr = localDateStr();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = localDateStr(yesterday);
 
     let html = '';
 
@@ -1525,69 +1805,81 @@
   // VIEW 3: BUDGETS & ANALYTICS RENDERING
   // ============================================================================
   function renderAnalytics() {
-    const metrics = getMonthSpendMetrics();
+    const metrics = getMonthBudgetModel();
     const sym = state.settings.currency;
 
-    // 1. Cash Flow Summary
-    dom.analyticsTotalIncome.textContent = `+${sym}${metrics.income.toFixed(2)}`;
-    dom.analyticsTotalExpense.textContent = `-${sym}${metrics.spent.toFixed(2)}`;
+    // 1. Cash Flow Summary — projected income so paychecks/settings aren't $0
+    if (dom.analyticsTotalIncome) {
+      dom.analyticsTotalIncome.textContent = `+${sym}${metrics.projectedIncome.toFixed(2)}`;
+    }
+    if (dom.analyticsIncomeHint) {
+      const extra = metrics.scheduledIncome > 0
+        ? ` · ${sym}${metrics.scheduledIncome.toFixed(2)} still scheduled`
+        : '';
+      dom.analyticsIncomeHint.textContent = `Received ${sym}${metrics.receivedIncome.toFixed(2)} of ${sym}${Math.max(metrics.expectedIncome, metrics.projectedIncome).toFixed(2)} expected${extra}`;
+    }
+    if (dom.analyticsTotalExpense) {
+      dom.analyticsTotalExpense.textContent = `-${sym}${metrics.spent.toFixed(2)}`;
+    }
     const netSign = metrics.netBalance >= 0 ? '+' : '-';
-    dom.analyticsNetBalance.textContent = `${netSign}${sym}${Math.abs(metrics.netBalance).toFixed(2)}`;
-    dom.analyticsNetBalance.style.color = metrics.netBalance >= 0 ? 'var(--primary-light)' : 'var(--accent-rose)';
+    if (dom.analyticsNetBalance) {
+      dom.analyticsNetBalance.textContent = `${netSign}${sym}${Math.abs(metrics.netBalance).toFixed(2)}`;
+      dom.analyticsNetBalance.style.color = metrics.netBalance >= 0 ? 'var(--primary-light)' : 'var(--accent-rose)';
+    }
 
-    // Recurring Bills Commitment calculation
-    let monthlyRecurTotal = 0;
-    (state.recurringRules || []).forEach(r => {
-      if (!r.active || r.type === 'income') return;
-      if (r.frequency === 'weekly') monthlyRecurTotal += r.amount * 4;
-      else if (r.frequency === 'biweekly') monthlyRecurTotal += r.amount * 2;
-      else if (r.frequency === 'semimonthly') monthlyRecurTotal += r.amount * 2;
-      else if (r.frequency === 'yearly') monthlyRecurTotal += r.amount / 12;
-      else monthlyRecurTotal += r.amount;
-    });
     if (dom.analyticsRecurringTotal) {
-      dom.analyticsRecurringTotal.textContent = `${sym}${monthlyRecurTotal.toFixed(2)}/mo`;
+      dom.analyticsRecurringTotal.textContent = `${sym}${metrics.billsReserved.toFixed(2)} held`;
     }
 
-    // 2. Total Budget Meter
-    dom.analyticsSpent.textContent = `${sym}${metrics.spent.toFixed(2)}`;
-    dom.analyticsBudgetLimit.textContent = `of ${sym}${metrics.budget.toLocaleString()} monthly budget`;
-    dom.budgetPercentageBadge.textContent = `${Math.round(metrics.percentSpent)}%`;
+    // 2. Fun / daily budget meter (derived, not a second cap)
+    if (dom.analyticsSpent) {
+      dom.analyticsSpent.textContent = `${sym}${metrics.funSpent.toFixed(2)}`;
+    }
+    if (dom.analyticsBudgetLimit) {
+      dom.analyticsBudgetLimit.textContent = `of ${sym}${metrics.budget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} daily pot`;
+    }
+    if (dom.budgetPercentageBadge) {
+      dom.budgetPercentageBadge.textContent = `${Math.round(metrics.percentSpent)}%`;
+    }
 
-    dom.analyticsBudgetBar.style.width = `${Math.min(100, metrics.percentSpent)}%`;
-    if (metrics.percentSpent > 90) {
-      dom.analyticsBudgetBar.style.background = 'linear-gradient(90deg, #F43F5E, #E11D48)';
-      dom.budgetPercentageBadge.style.color = '#F43F5E';
-      dom.budgetPercentageBadge.style.borderColor = 'rgba(244, 63, 94, 0.4)';
+    if (dom.analyticsBudgetBar) {
+      dom.analyticsBudgetBar.style.width = `${Math.min(100, metrics.percentSpent)}%`;
+    }
+    const overDaily = metrics.availableRaw < 0 || metrics.percentSpent > 90;
+    if (overDaily) {
+      if (dom.analyticsBudgetBar) dom.analyticsBudgetBar.style.background = 'linear-gradient(90deg, #F43F5E, #E11D48)';
+      if (dom.budgetPercentageBadge) {
+        dom.budgetPercentageBadge.style.color = '#F43F5E';
+        dom.budgetPercentageBadge.style.borderColor = 'rgba(244, 63, 94, 0.4)';
+      }
     } else if (metrics.percentSpent > 75) {
-      dom.analyticsBudgetBar.style.background = 'linear-gradient(90deg, #F59E0B, #D97706)';
-      dom.budgetPercentageBadge.style.color = '#F59E0B';
-      dom.budgetPercentageBadge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+      if (dom.analyticsBudgetBar) dom.analyticsBudgetBar.style.background = 'linear-gradient(90deg, #F59E0B, #D97706)';
+      if (dom.budgetPercentageBadge) {
+        dom.budgetPercentageBadge.style.color = '#F59E0B';
+        dom.budgetPercentageBadge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+      }
     } else {
-      dom.analyticsBudgetBar.style.background = 'linear-gradient(90deg, #10B981, #34D399)';
-      dom.budgetPercentageBadge.style.color = '#34D399';
-      dom.budgetPercentageBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+      if (dom.analyticsBudgetBar) dom.analyticsBudgetBar.style.background = 'linear-gradient(90deg, #10B981, #34D399)';
+      if (dom.budgetPercentageBadge) {
+        dom.budgetPercentageBadge.style.color = '#34D399';
+        dom.budgetPercentageBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+      }
     }
 
-    dom.analyticsRemaining.textContent = `${sym}${metrics.remaining.toFixed(2)}`;
-    dom.analyticsDailyPace.textContent = `${sym}${metrics.dailySafeSpend.toFixed(2)} / day`;
-    dom.analyticsDaysLeft.textContent = metrics.daysLeft;
-
-    // 3. After-Bills Budget (subtract upcoming recurring not yet posted)
-    const uncommittedBills = getUncommittedRecurringThisMonth();
-    const afterBillsRemaining = Math.max(0, metrics.remaining - uncommittedBills.totalExpense);
-    const trueDailyPace = metrics.daysLeft > 0 ? afterBillsRemaining / metrics.daysLeft : 0;
-
-    if (dom.analyticsAfterBills) {
-      dom.analyticsAfterBills.textContent = `${sym}${afterBillsRemaining.toFixed(2)}`;
-      dom.analyticsAfterBills.style.color = afterBillsRemaining < 100 ? 'var(--accent-rose)' : 'var(--accent-amber)';
+    if (dom.analyticsRemaining) {
+      dom.analyticsRemaining.textContent = `${sym}${metrics.remaining.toFixed(2)}`;
     }
-    if (dom.analyticsTrueDailyPace) {
-      dom.analyticsTrueDailyPace.textContent = `${sym}${trueDailyPace.toFixed(2)} / day`;
+    if (dom.analyticsDailyPace) {
+      dom.analyticsDailyPace.textContent = `${sym}${metrics.dailySafeSpend.toFixed(2)} / day`;
+    }
+    if (dom.analyticsDaysLeft) {
+      dom.analyticsDaysLeft.textContent = metrics.daysLeft;
     }
 
-    // 4. Per-Category Budget Progress Meters (Groceries, Gas, Misc, etc.)
-    renderCategoryBudgetMeters(metrics.categoryTotals);
+    renderBudgetWaterfall(metrics);
+
+    // 4. Per-Category Budget Progress Meters
+    renderCategoryBudgetMeters(metrics.categoryTotals, metrics.categoryTotalsById);
 
     // 5. Donut Chart & Category Bars
     renderDonutChart(metrics.categoryTotals, metrics.spent);
@@ -1604,15 +1896,52 @@
     renderSavingsGoals(metrics);
   }
 
-  function renderCategoryBudgetMeters(categoryTotals) {
+  function renderBudgetWaterfall(metrics) {
+    if (!dom.budgetWaterfall) return;
+    const sym = state.settings.currency;
+    const rows = [
+      { label: 'Income', value: metrics.projectedIncome, tone: 'income' }
+    ];
+    if (metrics.savingsReserved > 0.004) {
+      rows.push({ label: 'Savings this month', value: -metrics.savingsReserved, tone: 'hold' });
+    }
+    if (metrics.unpostedRecurringExpenses > 0.004) {
+      rows.push({ label: 'Bills (upcoming)', value: -metrics.unpostedRecurringExpenses, tone: 'hold' });
+    }
+    (metrics.reservedBreakdown || []).forEach(item => {
+      if (item.leftover > 0.004) {
+        rows.push({ label: `${item.name} leftover`, value: -item.leftover, tone: 'hold' });
+      }
+    });
+    if (metrics.reservedSpent > 0.004) {
+      rows.push({ label: 'Gas & bills spent', value: -metrics.reservedSpent, tone: 'hold' });
+    }
+    if (metrics.funSpent > 0.004) {
+      rows.push({ label: 'Fun spent', value: -metrics.funSpent, tone: 'spend' });
+    }
+    rows.push({ label: 'Left to spend', value: metrics.availableRaw, tone: 'left' });
+
+    dom.budgetWaterfall.innerHTML = rows.map(row => {
+      const prefix = row.value < 0 ? '−' : '';
+      return `
+        <div class="waterfall-row ${row.tone}">
+          <span class="waterfall-label">${escapeHtml(row.label)}</span>
+          <span class="waterfall-val">${prefix}${sym}${Math.abs(row.value).toFixed(2)}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderCategoryBudgetMeters(categoryTotals, categoryTotalsById = {}) {
     let html = '';
     const sym = state.settings.currency;
 
     state.categories.forEach(cat => {
-      const spent = categoryTotals[cat.name] || 0;
+      const spent = categoryTotalsById[cat.id] || categoryTotals[cat.name] || 0;
       const limit = cat.budgetLimit || 200;
       const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
       const fillWidth = Math.min(100, percent);
+      const reserved = isCategoryReserved(cat);
 
       let statusClass = 'safe';
       let statusText = `${sym}${(limit - spent).toFixed(2)} left`;
@@ -1635,7 +1964,7 @@
               <div class="cat-budget-icon" style="color: ${cat.color}; background: ${cat.color}18;">
                 ${getIconSvg(cat.icon || 'tag')}
               </div>
-              <span class="cat-budget-name">${escapeHtml(cat.name)}</span>
+              <span class="cat-budget-name">${escapeHtml(cat.name)}${reserved ? '<span class="reserved-badge">Held from daily</span>' : ''}</span>
             </div>
             <div class="cat-budget-numbers">
               <span class="cat-budget-spent">${sym}${spent.toFixed(2)}</span>
@@ -1653,7 +1982,9 @@
       `;
     });
 
-    dom.categoryBudgetMeters.innerHTML = html;
+    if (dom.categoryBudgetMeters) {
+      dom.categoryBudgetMeters.innerHTML = html;
+    }
   }
 
   function renderDonutChart(categoryTotals, totalSpent) {
@@ -1746,79 +2077,19 @@
     dom.methodBreakdownRow.innerHTML = html;
   }
 
-  // ============================================================================
-  // UPCOMING BILLS & UNCOMMITTED RECURRING CALCULATIONS
-  // ============================================================================
-  function getUncommittedRecurringThisMonth() {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    const todayStr = now.toISOString().split('T')[0];
-    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
-
-    let totalExpense = 0;
-    let totalIncome = 0;
-    const items = [];
-
-    (state.recurringRules || []).forEach(rule => {
-      if (!rule.active) return;
-
-      // Simulate upcoming occurrences this month that haven't been posted yet
-      let nextDate = rule.nextDueDate;
-      if (!nextDate) return;
-
-      let safetyLimit = 0;
-      while (nextDate <= lastDayOfMonth && safetyLimit < 10) {
-        safetyLimit++;
-        if (nextDate >= todayStr) {
-          const isPosted = state.transactions.some(tx =>
-            tx.note && tx.note.includes(rule.title) &&
-            tx.note.includes('(Recurring)') &&
-            tx.date === nextDate
-          );
-
-          items.push({
-            title: rule.title,
-            amount: rule.amount,
-            type: rule.type || 'expense',
-            date: nextDate,
-            frequency: rule.frequency,
-            posted: isPosted
-          });
-
-          if (!isPosted) {
-            if (rule.type === 'income') {
-              totalIncome += rule.amount;
-            } else {
-              totalExpense += rule.amount;
-            }
-          }
-        }
-
-        // Advance to next occurrence
-        nextDate = getNextOccurrence(nextDate, rule.frequency);
-      }
-    });
-
-    // Sort by date
-    items.sort((a, b) => a.date.localeCompare(b.date));
-
-    return { items, totalExpense, totalIncome };
-  }
-
   function renderUpcomingBills() {
     if (!dom.upcomingBillsList) return;
 
     const upcoming = getUncommittedRecurringThisMonth();
     const sym = state.settings.currency;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = localDateStr();
 
     if (dom.upcomingBillsCount) {
       dom.upcomingBillsCount.textContent = `${upcoming.items.length} this month`;
     }
 
     if (upcoming.items.length === 0) {
-      dom.upcomingBillsList.innerHTML = '<div class="upcoming-bills-empty">No upcoming bills this month. Add recurring rules in History \u003e Recurring.</div>';
+      dom.upcomingBillsList.innerHTML = '<div class="upcoming-bills-empty">No upcoming bills this month. Add paychecks or bills in History \u003e Bills &amp; Paychecks.</div>';
       return;
     }
 
@@ -1858,80 +2129,65 @@
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
-    const currentMonthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-    const budget = state.settings.monthlyBudget || 2000;
+    const thisMonthKey = currentMonthKey(now);
+    const metrics = currentMetrics || getMonthBudgetModel(now);
+    const budget = metrics.budget;
     const sym = state.settings.currency;
 
-    // Check Previous Calendar Month
-    const prevDate = new Date(currentYear, currentMonth - 1, 1);
-    const prevYear = prevDate.getFullYear();
-    const prevMonth = prevDate.getMonth();
-    const prevMonthKey = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}`;
+    const prevDate = new Date(currentYear, currentMonth, 0);
+    const prevMonthKey = currentMonthKey(prevDate);
     const prevMonthName = prevDate.toLocaleString('default', { month: 'long', year: 'numeric' });
     const currMonthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    let prevMonthSpent = 0;
-    state.transactions.forEach(tx => {
-      if (tx.type === 'income') return;
-      const d = new Date(tx.date || tx.createdAt);
-      if (d.getFullYear() === prevYear && d.getMonth() === prevMonth) {
-        prevMonthSpent += tx.amount;
-      }
-    });
-
-    const prevOverspend = prevMonthSpent - budget;
+    const prevModel = getMonthBudgetModel(prevDate);
+    const prevFunSpent = prevModel.funSpent;
+    const prevBudget = prevModel.budget;
+    const prevOverspend = prevFunSpent - prevBudget;
     const prevHasGoal = (state.savingsGoals || []).some(g => g.overspentMonth === prevMonthKey);
     const prevDismissed = (state.dismissedOverspends || []).includes(prevMonthKey);
 
-    // 1. Previous month overspent:
     if (prevOverspend > 0 && !prevHasGoal && !prevDismissed) {
       if (state.settings.autoRollOverspend) {
-        // Automatically create recoup goal for current month!
-        createOverspendRecoveryGoal(prevMonthKey, prevMonthName, prevOverspend, currentMonthKey, currMonthName, true);
+        createOverspendRecoveryGoal(prevMonthKey, prevMonthName, prevOverspend, thisMonthKey, currMonthName, true);
         dom.overspendRecoveryBanner.classList.add('hidden');
         return;
-      } else {
-        // Show recovery banner prompting user
-        state.pendingOverspendMonth = prevMonthKey;
-        state.pendingOverspendMonthName = prevMonthName;
-        state.pendingOverspendAmount = prevOverspend;
-        state.pendingTargetMonth = currentMonthKey;
-        state.pendingTargetMonthName = currMonthName;
-
-        dom.overspendBannerTitle.textContent = `${prevMonthName} Budget Overspent`;
-        dom.overspendBannerDesc.textContent = `You exceeded your budget by ${sym}${prevOverspend.toFixed(2)} (${sym}${prevMonthSpent.toFixed(2)} spent vs ${sym}${budget.toFixed(2)} budget). Set a recovery savings goal for ${currMonthName}?`;
-        dom.rollOverspendBtnText.textContent = `Make ${currMonthName} Goal (${sym}${prevOverspend.toFixed(2)})`;
-        dom.overspendRecoveryBanner.classList.remove('hidden');
-        return;
       }
+
+      state.pendingOverspendMonth = prevMonthKey;
+      state.pendingOverspendMonthName = prevMonthName;
+      state.pendingOverspendAmount = prevOverspend;
+      state.pendingTargetMonth = thisMonthKey;
+      state.pendingTargetMonthName = currMonthName;
+
+      dom.overspendBannerTitle.textContent = `${prevMonthName} Over Daily Pot`;
+      dom.overspendBannerDesc.textContent = `Fun spending exceeded the derived daily pot by ${sym}${prevOverspend.toFixed(2)} (${sym}${prevFunSpent.toFixed(2)} vs ${sym}${prevBudget.toFixed(2)}). Set a recovery savings goal for ${currMonthName}?`;
+      dom.rollOverspendBtnText.textContent = `Make ${currMonthName} Goal (${sym}${prevOverspend.toFixed(2)})`;
+      dom.overspendRecoveryBanner.classList.remove('hidden');
+      return;
     }
 
-    // 2. Current Month is currently over budget
-    const currOverspend = (currentMetrics ? currentMetrics.spent : 0) - budget;
-    const currHasGoal = (state.savingsGoals || []).some(g => g.overspentMonth === currentMonthKey);
-    const currDismissed = (state.dismissedOverspends || []).includes(currentMonthKey);
+    const currOverspend = metrics.funSpent - budget;
+    const currHasGoal = (state.savingsGoals || []).some(g => g.overspentMonth === thisMonthKey);
+    const currDismissed = (state.dismissedOverspends || []).includes(thisMonthKey);
 
     if (currOverspend > 0 && !currHasGoal && !currDismissed) {
       const nextDate = new Date(currentYear, currentMonth + 1, 1);
-      const nextYear = nextDate.getFullYear();
-      const nextMonth = nextDate.getMonth();
-      const nextMonthKey = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}`;
+      const nextMonthKey = currentMonthKey(nextDate);
       const nextMonthName = nextDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-      state.pendingOverspendMonth = currentMonthKey;
+      state.pendingOverspendMonth = thisMonthKey;
       state.pendingOverspendMonthName = currMonthName;
       state.pendingOverspendAmount = currOverspend;
       state.pendingTargetMonth = nextMonthKey;
       state.pendingTargetMonthName = nextMonthName;
 
-      dom.overspendBannerTitle.textContent = `Current Month Over Budget`;
-      dom.overspendBannerDesc.textContent = `You are currently ${sym}${currOverspend.toFixed(2)} over budget this month (${sym}${currentMetrics.spent.toFixed(2)} spent of ${sym}${budget.toFixed(2)} limit). Roll this into an offset savings goal for ${nextMonthName}?`;
+      dom.overspendBannerTitle.textContent = `Current Month Over Daily Pot`;
+      dom.overspendBannerDesc.textContent = `You are ${sym}${currOverspend.toFixed(2)} over the derived daily pot (${sym}${metrics.funSpent.toFixed(2)} spent of ${sym}${budget.toFixed(2)}). Roll this into a savings goal for ${nextMonthName}?`;
       dom.rollOverspendBtnText.textContent = `Make ${nextMonthName} Goal (${sym}${currOverspend.toFixed(2)})`;
       dom.overspendRecoveryBanner.classList.remove('hidden');
       return;
     }
 
-    // No active overspend to prompt
     dom.overspendRecoveryBanner.classList.add('hidden');
   }
 
@@ -1963,6 +2219,8 @@
     }
 
     renderSavingsGoals();
+    renderGlanceBar();
+    renderAnalytics();
 
     if (isAuto) {
       showToast('Savings Goal Auto-Created', `Added ${sym}${cleanAmount.toFixed(2)} recovery goal for ${targetMonthName}`, 'dollar');
@@ -1991,8 +2249,11 @@
 
     goals.forEach(g => {
       savedTotal += (g.savedAmount || 0);
-      if (g.targetMonth === currentMonthKey || g.targetMonth === 'all') {
-        targetThisMonth += (g.targetAmount || 0);
+      const remainingGoal = Math.max(0, (g.targetAmount || 0) - (g.savedAmount || 0));
+      if (g.targetMonth === currentMonthKey) {
+        targetThisMonth += remainingGoal;
+      } else if (g.targetMonth === 'all' && !g.completed) {
+        targetThisMonth += Math.max(0, g.monthlyContribution || 0);
       }
       if (!g.completed && (g.savedAmount || 0) < g.targetAmount) {
         activeCount++;
@@ -2361,24 +2622,36 @@
     }
 
     // Target month select
-    if (dom.goalTargetMonthSelect) {
-      dom.goalTargetMonthSelect.addEventListener('change', () => {
-        if (dom.goalTargetMonthSelect.value === 'custom') {
+    function updateGoalMonthUi() {
+      if (!dom.goalTargetMonthSelect) return;
+      const val = dom.goalTargetMonthSelect.value;
+      if (val === 'custom') {
+        if (dom.goalCustomMonthInput) {
           dom.goalCustomMonthInput.classList.remove('hidden');
           const now = new Date();
-          dom.goalCustomMonthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-          dom.goalMonthDisplayHint.textContent = 'Custom target month selected';
-        } else {
-          dom.goalCustomMonthInput.classList.add('hidden');
-          if (dom.goalTargetMonthSelect.value === 'next') {
-            dom.goalMonthDisplayHint.textContent = 'Applies to next month budget recovery';
-          } else if (dom.goalTargetMonthSelect.value === 'all') {
-            dom.goalMonthDisplayHint.textContent = 'Continuous target across multiple months';
-          } else {
-            dom.goalMonthDisplayHint.textContent = 'Goal applies to current monthly budget calculations';
+          if (!dom.goalCustomMonthInput.value) {
+            dom.goalCustomMonthInput.value = currentMonthKey(now);
           }
         }
-      });
+        if (dom.goalMonthDisplayHint) dom.goalMonthDisplayHint.textContent = 'Custom target month selected';
+        if (dom.goalMonthlyContributionGroup) dom.goalMonthlyContributionGroup.classList.add('hidden');
+      } else {
+        if (dom.goalCustomMonthInput) dom.goalCustomMonthInput.classList.add('hidden');
+        if (val === 'next') {
+          if (dom.goalMonthDisplayHint) dom.goalMonthDisplayHint.textContent = 'Held from next month\'s daily spend until filled';
+          if (dom.goalMonthlyContributionGroup) dom.goalMonthlyContributionGroup.classList.add('hidden');
+        } else if (val === 'all') {
+          if (dom.goalMonthDisplayHint) dom.goalMonthDisplayHint.textContent = 'Ongoing total. Set a monthly amount below to hold from daily spend.';
+          if (dom.goalMonthlyContributionGroup) dom.goalMonthlyContributionGroup.classList.remove('hidden');
+        } else {
+          if (dom.goalMonthDisplayHint) dom.goalMonthDisplayHint.textContent = 'Unfilled amount is held back from this month\'s daily spend';
+          if (dom.goalMonthlyContributionGroup) dom.goalMonthlyContributionGroup.classList.add('hidden');
+        }
+      }
+    }
+
+    if (dom.goalTargetMonthSelect) {
+      dom.goalTargetMonthSelect.addEventListener('change', updateGoalMonthUi);
     }
 
     // Preset chips
@@ -2454,6 +2727,9 @@
         }
         setActiveColor(goalToEdit.color || '#10B981');
         setActiveIcon(goalToEdit.icon || 'dollar');
+        if (dom.goalMonthlyContributionInput) {
+          dom.goalMonthlyContributionInput.value = goalToEdit.monthlyContribution || 0;
+        }
       } else {
         dom.savingsGoalModalTitle.textContent = 'New Savings Goal';
         dom.editingGoalId.value = '';
@@ -2461,11 +2737,13 @@
         dom.goalTargetAmountInput.value = '';
         dom.goalSavedAmountInput.value = '0';
         dom.goalTargetMonthSelect.value = 'current';
-        dom.goalCustomMonthInput.classList.add('hidden');
-        dom.goalMonthDisplayHint.textContent = 'Goal applies to current monthly budget calculations';
+        if (dom.goalMonthlyContributionInput) {
+          dom.goalMonthlyContributionInput.value = '0';
+        }
         setActiveColor('#10B981');
         setActiveIcon('dollar');
       }
+      updateGoalMonthUi();
 
       dom.savingsGoalModal.classList.remove('hidden');
       dom.goalNameInput.focus();
@@ -2514,6 +2792,8 @@
           targetMonth = dom.goalCustomMonthInput.value;
         }
 
+        const monthlyContribution = Math.max(0, parseFloat(dom.goalMonthlyContributionInput ? dom.goalMonthlyContributionInput.value : 0) || 0);
+
         const editId = dom.editingGoalId.value;
         if (editId) {
           const goal = (state.savingsGoals || []).find(g => g.id === editId);
@@ -2522,6 +2802,7 @@
             goal.targetAmount = parseFloat(targetAmount.toFixed(2));
             goal.savedAmount = parseFloat(savedAmount.toFixed(2));
             goal.targetMonth = targetMonth;
+            goal.monthlyContribution = monthlyContribution;
             goal.color = state.newGoalColor || '#10B981';
             goal.icon = state.newGoalIcon || 'dollar';
             goal.completed = goal.savedAmount >= goal.targetAmount;
@@ -2534,6 +2815,7 @@
             targetAmount: parseFloat(targetAmount.toFixed(2)),
             savedAmount: parseFloat(savedAmount.toFixed(2)),
             targetMonth,
+            monthlyContribution,
             color: state.newGoalColor || '#10B981',
             icon: state.newGoalIcon || 'dollar',
             autoGeneratedFromOverspend: false,
@@ -2551,6 +2833,8 @@
         saveSavingsGoals();
         dom.savingsGoalModal.classList.add('hidden');
         renderSavingsGoals();
+        renderGlanceBar();
+        renderAnalytics();
       });
     }
 
@@ -2573,6 +2857,8 @@
           state.savingsGoals = state.savingsGoals.filter(g => g.id !== goalId);
           saveSavingsGoals();
           renderSavingsGoals();
+          renderGlanceBar();
+          renderAnalytics();
           showToast('Goal Removed', `Deleted ${goal.name}`, 'trash');
         }
       });
@@ -2645,6 +2931,8 @@
       saveSavingsGoals();
       dom.goalContributeModal.classList.add('hidden');
       renderSavingsGoals();
+      renderGlanceBar();
+      renderAnalytics();
 
       const sym = state.settings.currency;
       if (isAdd) {
@@ -2713,13 +3001,20 @@
     const sym = state.settings.currency;
 
     state.categories.forEach(cat => {
+      const reserved = isCategoryReserved(cat);
       html += `
         <div class="category-limit-row" data-category-id="${cat.id}">
           <div class="cat-limit-info">
             <div class="cat-limit-icon" style="color: ${cat.color}; background: ${cat.color}18;">
               ${getIconSvg(cat.icon || 'tag')}
             </div>
-            <span class="cat-limit-name">${escapeHtml(cat.name)}</span>
+            <div class="cat-limit-text">
+              <span class="cat-limit-name">${escapeHtml(cat.name)}</span>
+              <label class="hold-daily-toggle">
+                <input type="checkbox" class="hold-daily-checkbox" data-category-id="${cat.id}" ${reserved ? 'checked' : ''}>
+                Hold from daily
+              </label>
+            </div>
           </div>
           <div class="cat-limit-input-wrap">
             <span class="cat-limit-symbol">${sym}</span>
@@ -2740,26 +3035,56 @@
           triggerHaptic(14);
           targetCat.budgetLimit = newLimit;
           saveCategories();
-          renderCategoryBudgetMeters(getMonthSpendMetrics().categoryTotals);
+          renderCategoryBudgetMeters(getMonthSpendMetrics().categoryTotals, getMonthSpendMetrics().categoryTotalsById);
           scheduleSettingsPushToSheets(30);
           showToast('Limit Updated', `${targetCat.name} limit set to ${sym}${newLimit}`, 'check');
         }
       });
     });
+
+    dom.categoryLimitsEditorList.querySelectorAll('.hold-daily-checkbox').forEach(box => {
+      box.addEventListener('change', () => {
+        const catId = box.getAttribute('data-category-id');
+        const ids = getReservedCategoryIds();
+        if (box.checked && !ids.includes(catId)) ids.push(catId);
+        if (!box.checked) {
+          const idx = ids.indexOf(catId);
+          if (idx >= 0) ids.splice(idx, 1);
+        }
+        state.settings.reservedCategoryIds = ids;
+        saveSettings();
+        triggerHaptic(12);
+        renderGlanceBar();
+        renderAnalytics();
+        scheduleSettingsPushToSheets(30);
+        const cat = state.categories.find(c => c.id === catId);
+        showToast(box.checked ? 'Held from daily' : 'Counts as daily', cat ? cat.name : 'Category', 'check');
+      });
+    });
   }
 
   function loadSettingsIntoDom() {
-    dom.monthlyIncomeInput.value = state.settings.expectedIncome || 3500;
-    dom.monthlyBudgetInput.value = state.settings.monthlyBudget || 2000;
-    dom.currencySelect.value = state.settings.currency;
-    dom.currencySymbol.textContent = state.entryMode === 'income' ? '+' + state.settings.currency : state.settings.currency;
-    dom.hapticsToggle.checked = state.settings.haptics !== false;
+    if (dom.monthlyIncomeInput) {
+      dom.monthlyIncomeInput.value = state.settings.expectedIncome || 3500;
+    }
+    if (dom.currencySelect) {
+      dom.currencySelect.value = state.settings.currency;
+    }
+    if (dom.currencySymbol) {
+      dom.currencySymbol.textContent = state.entryMode === 'income' ? '+' + state.settings.currency : state.settings.currency;
+    }
+    if (dom.hapticsToggle) {
+      dom.hapticsToggle.checked = state.settings.haptics !== false;
+    }
     if (dom.autoRollOverspendToggle) {
       dom.autoRollOverspendToggle.checked = state.settings.autoRollOverspend !== false;
     }
-    dom.sheetsWebhookInput.value = state.settings.sheetsUrl || '';
+    if (dom.sheetsWebhookInput) {
+      dom.sheetsWebhookInput.value = state.settings.sheetsUrl || '';
+    }
 
     renderCategoryLimitsEditor();
+    renderGlanceBar();
     updatePendingBadge();
     updateSyncStatusBadge(state.settings.sheetsUrl ? 'online' : 'local');
     updateSettingsSyncStatusUI(0);
@@ -2770,11 +3095,6 @@
     const incomeVal = parseFloat(dom.monthlyIncomeInput.value);
     if (!isNaN(incomeVal) && incomeVal >= 0) {
       state.settings.expectedIncome = incomeVal;
-    }
-
-    const budgetVal = parseFloat(dom.monthlyBudgetInput.value);
-    if (!isNaN(budgetVal) && budgetVal > 0) {
-      state.settings.monthlyBudget = budgetVal;
     }
 
     state.settings.currency = dom.currencySelect.value;
@@ -2919,7 +3239,7 @@
       state.selectedCategoryId = newCat.id;
       renderCategoryGrid();
       renderCategoryFilterPills();
-      renderCategoryBudgetMeters(getMonthSpendMetrics().categoryTotals);
+      renderCategoryBudgetMeters(getMonthSpendMetrics().categoryTotals, getMonthSpendMetrics().categoryTotalsById);
       renderCategoryLimitsEditor();
 
       dom.categoryModal.classList.add('hidden');
@@ -2933,17 +3253,15 @@
   // RECURRING BILLS & SUBSCRIPTIONS ENGINE
   // ============================================================================
   function getNextOccurrence(fromDateStr, frequency, targetDay = null) {
-    if (!fromDateStr) fromDateStr = new Date().toISOString().split('T')[0];
+    if (!fromDateStr) fromDateStr = localDateStr();
     const parts = fromDateStr.split('-').map(Number);
     const d = new Date(parts[0], parts[1] - 1, parts[2]);
 
     if (frequency === 'weekly') {
       d.setDate(d.getDate() + 7);
     } else if (frequency === 'biweekly') {
-      // Exactly 14 days later (alternating every 2 weeks)
       d.setDate(d.getDate() + 14);
     } else if (frequency === 'semimonthly') {
-      // Twice a month: 1st and 15th
       const curDay = d.getDate();
       if (curDay < 15) {
         d.setDate(15);
@@ -2953,7 +3271,6 @@
     } else if (frequency === 'yearly') {
       d.setFullYear(d.getFullYear() + 1);
     } else {
-      // Monthly (default)
       const nextMonth = d.getMonth() + 1;
       const desiredDay = targetDay ? Math.min(targetDay, 28) : Math.min(parts[2], 28);
       d.setMonth(nextMonth, desiredDay);
@@ -2962,7 +3279,7 @@
       d.setDate(Math.min(actualTarget, daysInTargetMonth));
     }
 
-    return d.toISOString().split('T')[0];
+    return localDateStr(d);
   }
 
   function formatFrequency(freq) {
@@ -2979,8 +3296,9 @@
   function formatDateFriendly(dateStr) {
     if (!dateStr) return 'N/A';
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const todayStr = localDateStr(now);
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const tomorrowStr = localDateStr(tomorrow);
     if (dateStr === todayStr) return 'Today';
     if (dateStr === tomorrowStr) return 'Tomorrow';
 
@@ -2992,7 +3310,7 @@
 
   function checkAndProcessRecurring() {
     if (!state.recurringRules || state.recurringRules.length === 0) return 0;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = localDateStr();
     let postedCount = 0;
 
     state.recurringRules.forEach(rule => {
@@ -3048,8 +3366,8 @@
     if (!state.recurringRules || state.recurringRules.length === 0) {
       dom.recurringList.innerHTML = `
         <div class="recurring-empty-state" style="text-align: center; padding: 18px 10px; color: var(--text-muted); font-size: 0.85rem;">
-          <p style="margin-bottom: 4px; font-weight: 500;">No recurring bills or subscriptions added yet.</p>
-          <span style="font-size: 0.76rem; color: var(--text-secondary);">Tap "+ Add Rule" to schedule rent, Netflix, gym, or salary.</span>
+          <p style="margin-bottom: 4px; font-weight: 500;">No bills or paychecks scheduled yet.</p>
+          <span style="font-size: 0.76rem; color: var(--text-secondary);">Tap "+ Add" to schedule rent, Netflix, gym, or salary.</span>
         </div>
       `;
       return;
@@ -3092,7 +3410,7 @@
               <button type="button" class="rec-btn-small toggle-active-btn" data-toggle-id="${rule.id}">
                 ${pauseLabel}
               </button>
-              <button type="button" class="rec-btn-small delete-rule-btn" data-del-id="${rule.id}" title="Delete rule">
+              <button type="button" class="rec-btn-small delete-rule-btn" data-del-id="${rule.id}" title="Delete">
                 Delete
               </button>
             </div>
@@ -3133,7 +3451,7 @@
     const rule = state.recurringRules.find(r => r.id === ruleId);
     if (!rule) return;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = localDateStr();
     const now = new Date();
 
     const tx = {
@@ -3177,7 +3495,7 @@
     renderRecurringList();
     renderAnalytics();
 
-    showToast(rule.active ? 'Rule Resumed' : 'Rule Paused', rule.title, 'info');
+    showToast(rule.active ? 'Resumed' : 'Paused', rule.title, 'info');
   }
 
   function deleteRecurringRule(ruleId) {
@@ -3190,7 +3508,7 @@
     renderRecurringList();
     renderAnalytics();
 
-    showToast('Rule Deleted', `Removed ${removed.title}`, 'trash');
+    showToast('Removed', `Removed ${removed.title}`, 'trash');
   }
 
   function setupRecurringManager() {
@@ -3209,7 +3527,7 @@
       populateCategories();
 
       if (ruleToEdit) {
-        dom.recurringModalTitle.textContent = 'Edit Recurring Rule';
+        dom.recurringModalTitle.textContent = 'Edit Bill / Paycheck';
         dom.editingRecurId.value = ruleToEdit.id;
         dom.newRecurTitle.value = ruleToEdit.title;
         dom.newRecurAmount.value = ruleToEdit.amount;
@@ -3217,18 +3535,18 @@
         populateCategories();
         dom.newRecurCategory.value = ruleToEdit.categoryId || '';
         dom.newRecurFrequency.value = ruleToEdit.frequency || 'monthly';
-        dom.newRecurNextDate.value = ruleToEdit.nextDueDate || new Date().toISOString().split('T')[0];
+        dom.newRecurNextDate.value = ruleToEdit.nextDueDate || localDateStr();
         dom.newRecurAutoPost.checked = ruleToEdit.autoPost !== false;
         updateFrequencyHint();
       } else {
-        dom.recurringModalTitle.textContent = 'New Recurring Bill / Income';
+        dom.recurringModalTitle.textContent = 'New Bill / Paycheck';
         dom.editingRecurId.value = '';
         dom.newRecurTitle.value = '';
         dom.newRecurAmount.value = '';
         dom.newRecurType.value = 'expense';
         populateCategories();
         dom.newRecurFrequency.value = 'monthly';
-        dom.newRecurNextDate.value = new Date().toISOString().split('T')[0];
+        dom.newRecurNextDate.value = localDateStr();
         dom.newRecurAutoPost.checked = true;
         updateFrequencyHint();
       }
@@ -3288,7 +3606,7 @@
         const catList = type === 'income' ? state.incomeCategories : state.categories;
         const categoryObj = catList.find(c => c.id === dom.newRecurCategory.value) || catList[0];
         const freq = dom.newRecurFrequency.value;
-        const nextDate = dom.newRecurNextDate.value || new Date().toISOString().split('T')[0];
+        const nextDate = dom.newRecurNextDate.value || localDateStr();
         const autoPost = dom.newRecurAutoPost.checked;
 
         triggerHaptic(20);
@@ -3326,11 +3644,13 @@
         saveRecurringRules();
         pushSettingsToSheets();
         renderRecurringList();
+        renderRecurringSummary();
+        renderGlanceBar();
         renderAnalytics();
         checkAndProcessRecurring();
 
         dom.recurringModal.classList.add('hidden');
-        showToast('Rule Saved', `${title} (${state.settings.currency}${amount.toFixed(2)} ${formatFrequency(freq)})`, 'bills');
+        showToast('Saved', `${title} (${state.settings.currency}${amount.toFixed(2)} ${formatFrequency(freq)})`, 'bills');
       });
     }
 
@@ -3638,8 +3958,9 @@
       }, 300);
     };
 
-    dom.monthlyIncomeInput.addEventListener('input', triggerAutoSave);
-    dom.monthlyBudgetInput.addEventListener('input', triggerAutoSave);
+    if (dom.monthlyIncomeInput) {
+      dom.monthlyIncomeInput.addEventListener('input', triggerAutoSave);
+    }
     dom.currencySelect.addEventListener('change', () => saveGeneralSettings(false, 30));
     dom.hapticsToggle.addEventListener('change', () => saveGeneralSettings(false, 30));
     if (dom.autoRollOverspendToggle) {
@@ -3827,7 +4148,7 @@
     cacheDomElements();
     loadData();
 
-    dom.expenseDateInput.value = new Date().toISOString().split('T')[0];
+    dom.expenseDateInput.value = localDateStr();
 
     updateTopMonthHeader();
     renderCategoryGrid();
@@ -3865,6 +4186,6 @@
     init();
   }
 
-  window.__budgie = { state, dom, renderAnalytics, checkMonthOverspends, getMonthSpendMetrics, createOverspendRecoveryGoal };
+  window.__budgie = { state, dom, renderAnalytics, checkMonthOverspends, getMonthSpendMetrics, getMonthBudgetModel, createOverspendRecoveryGoal };
 
 })();
