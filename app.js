@@ -121,6 +121,42 @@
     return localDateStr(new Date(year, monthIndex, 1));
   }
 
+  function shiftMonthKey(monthKey, delta) {
+    const [y, m] = String(monthKey).split('-').map(Number);
+    return currentMonthKey(new Date(y, (m - 1) + delta, 1));
+  }
+
+  function monthKeyToDate(monthKey) {
+    const [y, m] = String(monthKey).split('-').map(Number);
+    return new Date(y, m - 1, 1);
+  }
+
+  function formatMonthLabel(monthKey) {
+    const d = monthKeyToDate(monthKey);
+    return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+  }
+
+  function getSelectedAnalyticsMonthKey() {
+    return state.analyticsMonthKey || currentMonthKey();
+  }
+
+  function getAnalyticsMonthBounds() {
+    const now = new Date();
+    const newest = new Date(now.getFullYear(), now.getMonth(), 1);
+    let oldest = new Date(now.getFullYear(), now.getMonth() - 24, 1);
+    (state.transactions || []).forEach(tx => {
+      const d = parseLocalDate(tx.date || tx.createdAt);
+      if (isNaN(d.getTime())) return;
+      const start = new Date(d.getFullYear(), d.getMonth(), 1);
+      if (start < oldest) oldest = start;
+    });
+    return { oldest, newest };
+  }
+
+  function isAnalyticsLiveMonth() {
+    return state.analyticsTimeframe === 'month' && getSelectedAnalyticsMonthKey() === currentMonthKey();
+  }
+
   function getReservedCategoryIds() {
     const stored = state.settings && state.settings.reservedCategoryIds;
     if (Array.isArray(stored) && stored.length > 0) {
@@ -244,7 +280,8 @@
     activeView: 'view-add',
     historyCategoryFilter: 'all',
     historySearchQuery: '',
-    analyticsTimeframe: 'month',
+    analyticsTimeframe: 'month', // 'month' | 'all'
+    analyticsMonthKey: '',
     
     // Custom Category Form State
     newCategoryIcon: 'tag',
@@ -406,6 +443,18 @@
     dom.analyticsAfterBills = document.getElementById('analyticsAfterBills');
     dom.analyticsTrueDailyPace = document.getElementById('analyticsTrueDailyPace');
     dom.analyticsIncomeHint = document.getElementById('analyticsIncomeHint');
+    dom.analyticsCashflowCaption = document.getElementById('analyticsCashflowCaption');
+    dom.analyticsIncomeLabel = document.getElementById('analyticsIncomeLabel');
+    dom.analyticsBillsHeldRow = document.getElementById('analyticsBillsHeldRow');
+    dom.analyticsSpendableCaption = document.getElementById('analyticsSpendableCaption');
+    dom.analyticsDailyPaceLabel = document.getElementById('analyticsDailyPaceLabel');
+    dom.analyticsDaysLeftLabel = document.getElementById('analyticsDaysLeftLabel');
+    dom.analyticsDailyHint = document.getElementById('analyticsDailyHint');
+    dom.analyticsPrevMonthBtn = document.getElementById('analyticsPrevMonthBtn');
+    dom.analyticsNextMonthBtn = document.getElementById('analyticsNextMonthBtn');
+    dom.analyticsPeriodLabelBtn = document.getElementById('analyticsPeriodLabelBtn');
+    dom.analyticsAllTimeBtn = document.getElementById('analyticsAllTimeBtn');
+    dom.viewAnalytics = document.getElementById('view-analytics');
     dom.budgetWaterfall = document.getElementById('budgetWaterfall');
     dom.paycheckIncomeHint = document.getElementById('paycheckIncomeHint');
     dom.derivedBudgetDisplay = document.getElementById('derivedBudgetDisplay');
@@ -1439,7 +1488,7 @@
     }
   }
 
-  function getMonthBudgetModel(refDate = new Date()) {
+  function getMonthBudgetModel(refDate = new Date(), opts = {}) {
     const year = refDate.getFullYear();
     const month = refDate.getMonth();
     const monthKey = currentMonthKey(refDate);
@@ -1485,7 +1534,9 @@
     const scheduledIncome = uncommitted.totalIncome;
     const unpostedRecurringExpenses = uncommitted.totalExpense;
     const expectedIncome = parseFloat(state.settings.expectedIncome) || 0;
-    const projectedIncome = Math.max(receivedIncome + scheduledIncome, expectedIncome);
+    const projectedIncome = (isCurrentMonth || (opts && opts.useExpectedFloor))
+      ? Math.max(receivedIncome + scheduledIncome, expectedIncome)
+      : (receivedIncome + scheduledIncome);
 
     const savingsReserved = getSavingsReservedForMonth(monthKey);
 
@@ -1517,8 +1568,10 @@
 
     const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
     const dayOfMonth = isCurrentMonth ? today.getDate() : totalDaysInMonth;
-    const daysLeft = isCurrentMonth ? Math.max(1, totalDaysInMonth - dayOfMonth + 1) : 1;
-    const dailySafeSpend = daysLeft > 0 ? remaining / daysLeft : 0;
+    const daysLeft = isCurrentMonth ? Math.max(1, totalDaysInMonth - dayOfMonth + 1) : 0;
+    const dailySafeSpend = isCurrentMonth
+      ? (daysLeft > 0 ? remaining / daysLeft : 0)
+      : (totalDaysInMonth > 0 ? funSpent / totalDaysInMonth : 0);
 
     const netBalance = receivedIncome - totalMonthSpent;
 
@@ -1551,12 +1604,76 @@
       reservedBreakdown,
       billsReserved,
       projectedIncome,
-      monthKey
+      monthKey,
+      isCurrentMonth,
+      isAllTime: false,
+      daysInMonth: totalDaysInMonth
     };
   }
 
   function getMonthSpendMetrics() {
     return getMonthBudgetModel(new Date());
+  }
+
+  function getAllTimeBudgetModel() {
+    let totalSpent = 0;
+    let receivedIncome = 0;
+    let funSpent = 0;
+    let reservedSpent = 0;
+    const categoryTotals = {};
+    const categoryTotalsById = {};
+    const methodTotals = {};
+
+    (state.transactions || []).forEach(tx => {
+      if (tx.type === 'income') {
+        receivedIncome += tx.amount;
+        return;
+      }
+      totalSpent += tx.amount;
+      categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + tx.amount;
+      if (tx.categoryId) {
+        categoryTotalsById[tx.categoryId] = (categoryTotalsById[tx.categoryId] || 0) + tx.amount;
+      }
+      methodTotals[tx.method || 'Card'] = (methodTotals[tx.method || 'Card'] || 0) + tx.amount;
+      if (isTxReservedExpense(tx)) {
+        reservedSpent += tx.amount;
+      } else {
+        funSpent += tx.amount;
+      }
+    });
+
+    const netBalance = receivedIncome - totalSpent;
+
+    return {
+      spent: totalSpent,
+      funSpent,
+      reservedSpent,
+      income: receivedIncome,
+      receivedIncome,
+      scheduledIncome: 0,
+      expectedIncome: parseFloat(state.settings.expectedIncome) || 0,
+      paycheckEquivalent: getMonthlyRecurringIncomeEquivalent(),
+      netBalance,
+      budget: 0,
+      remaining: Math.max(0, netBalance),
+      availableRaw: netBalance,
+      percentSpent: receivedIncome > 0 ? Math.min(100, (totalSpent / receivedIncome) * 100) : (totalSpent > 0 ? 100 : 0),
+      daysLeft: 0,
+      dailySafeSpend: 0,
+      categoryTotals,
+      categoryTotalsById,
+      methodTotals,
+      savingsReserved: 0,
+      unpostedRecurringExpenses: 0,
+      leftoverReserved: 0,
+      reservedBreakdown: [],
+      billsReserved: 0,
+      projectedIncome: receivedIncome,
+      monthKey: 'all',
+      isCurrentMonth: false,
+      isAllTime: true,
+      daysInMonth: 0
+    };
   }
 
   function renderGlanceBar() {
@@ -1804,19 +1921,150 @@
   // ============================================================================
   // VIEW 3: BUDGETS & ANALYTICS RENDERING
   // ============================================================================
+  function shiftAnalyticsMonth(delta) {
+    const bounds = getAnalyticsMonthBounds();
+    const nextKey = shiftMonthKey(getSelectedAnalyticsMonthKey(), delta);
+    const nextDate = monthKeyToDate(nextKey);
+    if (nextDate < bounds.oldest || nextDate > bounds.newest) {
+      if (state.analyticsTimeframe === 'all') {
+        state.analyticsTimeframe = 'month';
+        renderAnalytics();
+      }
+      return;
+    }
+    state.analyticsTimeframe = 'month';
+    state.analyticsMonthKey = nextKey;
+    renderAnalytics();
+  }
+
+  function jumpAnalyticsToCurrentMonth() {
+    state.analyticsTimeframe = 'month';
+    state.analyticsMonthKey = currentMonthKey();
+    renderAnalytics();
+  }
+
+  function updateInsightsPeriodChrome(metrics) {
+    const isAllTime = !!(metrics && metrics.isAllTime);
+    const monthKey = getSelectedAnalyticsMonthKey();
+    const bounds = getAnalyticsMonthBounds();
+    const selectedDate = monthKeyToDate(monthKey);
+    const isCurrent = monthKey === currentMonthKey();
+
+    if (dom.viewAnalytics) {
+      dom.viewAnalytics.classList.toggle('insights-all-time', isAllTime);
+    }
+    if (dom.analyticsPeriodLabelBtn) {
+      if (isAllTime) {
+        dom.analyticsPeriodLabelBtn.textContent = formatMonthLabel(monthKey);
+      } else if (isCurrent) {
+        dom.analyticsPeriodLabelBtn.textContent = 'This Month';
+      } else {
+        dom.analyticsPeriodLabelBtn.textContent = formatMonthLabel(monthKey);
+      }
+    }
+    if (dom.analyticsAllTimeBtn) {
+      dom.analyticsAllTimeBtn.classList.toggle('active', isAllTime);
+    }
+    if (dom.analyticsPrevMonthBtn) {
+      const atOldest = selectedDate <= bounds.oldest;
+      dom.analyticsPrevMonthBtn.disabled = atOldest && !isAllTime;
+    }
+    if (dom.analyticsNextMonthBtn) {
+      const atNewest = selectedDate >= bounds.newest;
+      dom.analyticsNextMonthBtn.disabled = atNewest && !isAllTime;
+    }
+
+    if (dom.analyticsCashflowCaption) {
+      if (isAllTime) {
+        dom.analyticsCashflowCaption.textContent = 'All-time cash flow';
+      } else if (isCurrent) {
+        dom.analyticsCashflowCaption.textContent = "This month's cash flow";
+      } else {
+        dom.analyticsCashflowCaption.textContent = `${formatMonthLabel(monthKey)} cash flow`;
+      }
+    }
+    if (dom.analyticsIncomeLabel) {
+      dom.analyticsIncomeLabel.textContent = isAllTime ? 'Total Income' : (isCurrent ? 'Projected Income' : 'Income');
+    }
+    if (dom.analyticsSpendableCaption) {
+      dom.analyticsSpendableCaption.textContent = isCurrent
+        ? 'Spendable this month'
+        : `Spendable in ${formatMonthLabel(monthKey)}`;
+    }
+    if (dom.analyticsDailyPaceLabel) {
+      dom.analyticsDailyPaceLabel.textContent = isCurrent ? 'Daily available' : 'Avg / day';
+    }
+    if (dom.analyticsDaysLeftLabel) {
+      dom.analyticsDaysLeftLabel.textContent = isCurrent ? 'Days left' : 'Days in month';
+    }
+    if (dom.analyticsDailyHint) {
+      dom.analyticsDailyHint.classList.toggle('hidden', !isCurrent);
+    }
+  }
+
+  function setupInsightsPeriodNav() {
+    if (dom.analyticsPrevMonthBtn) {
+      dom.analyticsPrevMonthBtn.addEventListener('click', () => {
+        triggerHaptic(12);
+        shiftAnalyticsMonth(-1);
+      });
+    }
+    if (dom.analyticsNextMonthBtn) {
+      dom.analyticsNextMonthBtn.addEventListener('click', () => {
+        triggerHaptic(12);
+        shiftAnalyticsMonth(1);
+      });
+    }
+    if (dom.analyticsPeriodLabelBtn) {
+      dom.analyticsPeriodLabelBtn.addEventListener('click', () => {
+        triggerHaptic(12);
+        jumpAnalyticsToCurrentMonth();
+      });
+    }
+    if (dom.analyticsAllTimeBtn) {
+      dom.analyticsAllTimeBtn.addEventListener('click', () => {
+        triggerHaptic(12);
+        if (state.analyticsTimeframe === 'all') {
+          jumpAnalyticsToCurrentMonth();
+          return;
+        }
+        state.analyticsTimeframe = 'all';
+        renderAnalytics();
+      });
+    }
+  }
+
   function renderAnalytics() {
-    const metrics = getMonthBudgetModel();
+    if (!state.analyticsMonthKey) {
+      state.analyticsMonthKey = currentMonthKey();
+    }
+
+    const isAllTime = state.analyticsTimeframe === 'all';
+    const monthKey = getSelectedAnalyticsMonthKey();
+    const refDate = monthKeyToDate(monthKey);
+    const metrics = isAllTime ? getAllTimeBudgetModel() : getMonthBudgetModel(refDate);
+    const liveMetrics = isAnalyticsLiveMonth() ? metrics : getMonthBudgetModel(new Date());
     const sym = state.settings.currency;
 
-    // 1. Cash Flow Summary — projected income so paychecks/settings aren't $0
+    updateInsightsPeriodChrome(metrics);
+
     if (dom.analyticsTotalIncome) {
       dom.analyticsTotalIncome.textContent = `+${sym}${metrics.projectedIncome.toFixed(2)}`;
     }
     if (dom.analyticsIncomeHint) {
-      const extra = metrics.scheduledIncome > 0
-        ? ` · ${sym}${metrics.scheduledIncome.toFixed(2)} still scheduled`
-        : '';
-      dom.analyticsIncomeHint.textContent = `Received ${sym}${metrics.receivedIncome.toFixed(2)} of ${sym}${Math.max(metrics.expectedIncome, metrics.projectedIncome).toFixed(2)} expected${extra}`;
+      if (isAllTime) {
+        dom.analyticsIncomeHint.textContent = 'All logged income and spending';
+      } else if (metrics.isCurrentMonth) {
+        const extra = metrics.scheduledIncome > 0
+          ? ` · ${sym}${metrics.scheduledIncome.toFixed(2)} still scheduled`
+          : '';
+        dom.analyticsIncomeHint.textContent = `Received ${sym}${metrics.receivedIncome.toFixed(2)} of ${sym}${Math.max(metrics.expectedIncome, metrics.projectedIncome).toFixed(2)} expected${extra}`;
+      } else {
+        const extra = metrics.scheduledIncome > 0
+          ? ` · ${sym}${metrics.scheduledIncome.toFixed(2)} still scheduled`
+          : '';
+        dom.analyticsIncomeHint.textContent = `Received ${sym}${metrics.receivedIncome.toFixed(2)}${extra}`;
+      }
     }
     if (dom.analyticsTotalExpense) {
       dom.analyticsTotalExpense.textContent = `-${sym}${metrics.spent.toFixed(2)}`;
@@ -1831,12 +2079,11 @@
       dom.analyticsRecurringTotal.textContent = `${sym}${metrics.billsReserved.toFixed(2)} held`;
     }
 
-    // 2. Fun / daily budget meter (derived, not a second cap)
     if (dom.analyticsSpent) {
       dom.analyticsSpent.textContent = `${sym}${metrics.funSpent.toFixed(2)}`;
     }
     if (dom.analyticsBudgetLimit) {
-      dom.analyticsBudgetLimit.textContent = `of ${sym}${metrics.budget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} daily pot`;
+      dom.analyticsBudgetLimit.textContent = `of ${sym}${metrics.budget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} spendable`;
     }
     if (dom.budgetPercentageBadge) {
       dom.budgetPercentageBadge.textContent = `${Math.round(metrics.percentSpent)}%`;
@@ -1873,27 +2120,28 @@
       dom.analyticsDailyPace.textContent = `${sym}${metrics.dailySafeSpend.toFixed(2)} / day`;
     }
     if (dom.analyticsDaysLeft) {
-      dom.analyticsDaysLeft.textContent = metrics.daysLeft;
+      if (metrics.isCurrentMonth) {
+        dom.analyticsDaysLeft.textContent = metrics.daysLeft;
+      } else {
+        dom.analyticsDaysLeft.textContent = metrics.daysInMonth || '—';
+      }
     }
 
     renderBudgetWaterfall(metrics);
 
-    // 4. Per-Category Budget Progress Meters
     renderCategoryBudgetMeters(metrics.categoryTotals, metrics.categoryTotalsById);
 
-    // 5. Donut Chart & Category Bars
     renderDonutChart(metrics.categoryTotals, metrics.spent);
-    renderCategoryBars(metrics.categoryTotals, metrics.spent);
+    renderCategoryBars(metrics.categoryTotals, metrics.spent, isAllTime);
     renderPaymentBreakdown(metrics.methodTotals);
 
-    // 6. Upcoming Bills Timeline
-    renderUpcomingBills();
+    if (!isAllTime) {
+      renderUpcomingBills(refDate.getFullYear(), refDate.getMonth());
+    }
 
-    // 7. Check Month Overspends & Rollover
-    checkMonthOverspends(metrics);
+    checkMonthOverspends(liveMetrics);
 
-    // 8. Savings Goals & Targets
-    renderSavingsGoals(metrics);
+    renderSavingsGoals(liveMetrics);
   }
 
   function renderBudgetWaterfall(metrics) {
@@ -2026,10 +2274,13 @@
     dom.categoryDonutChart.innerHTML = svgContent;
   }
 
-  function renderCategoryBars(categoryTotals, totalSpent) {
+  function renderCategoryBars(categoryTotals, totalSpent, isAllTime = false) {
     const entries = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
     if (entries.length === 0) {
-      dom.categoryBarsList.innerHTML = '<div style="color: var(--text-muted); font-size: 0.82rem; text-align: center;">No expenses recorded this month yet.</div>';
+      const emptyMsg = isAllTime
+        ? 'No expenses recorded yet.'
+        : 'No expenses recorded this month yet.';
+      dom.categoryBarsList.innerHTML = `<div style="color: var(--text-muted); font-size: 0.82rem; text-align: center;">${emptyMsg}</div>`;
       return;
     }
 
@@ -2077,15 +2328,24 @@
     dom.methodBreakdownRow.innerHTML = html;
   }
 
-  function renderUpcomingBills() {
+  function renderUpcomingBills(year, monthIndex) {
     if (!dom.upcomingBillsList) return;
 
-    const upcoming = getUncommittedRecurringThisMonth();
+    const now = new Date();
+    const y = typeof year === 'number' ? year : now.getFullYear();
+    const m = typeof monthIndex === 'number' ? monthIndex : now.getMonth();
+    const upcoming = getUncommittedRecurringForMonth(y, m);
     const sym = state.settings.currency;
     const todayStr = localDateStr();
+    const isCurrent = y === now.getFullYear() && m === now.getMonth();
 
     if (dom.upcomingBillsCount) {
-      dom.upcomingBillsCount.textContent = `${upcoming.items.length} this month`;
+      if (isCurrent) {
+        dom.upcomingBillsCount.textContent = `${upcoming.items.length} this month`;
+      } else {
+        const shortLabel = new Date(y, m, 1).toLocaleString('default', { month: 'short' });
+        dom.upcomingBillsCount.textContent = `${upcoming.items.length} in ${shortLabel}`;
+      }
     }
 
     if (upcoming.items.length === 0) {
@@ -2101,9 +2361,9 @@
       const isPastDue = item.date < todayStr && !item.posted;
       let itemClass = 'upcoming-bill-item';
       if (item.posted) itemClass += ' posted';
-      else if (isPastDue) itemClass += ' past-due';
+      else if (isPastDue && isCurrent) itemClass += ' past-due';
 
-      const dateObj = new Date(item.date + 'T00:00:00');
+      const dateObj = parseLocalDate(item.date);
       const dateLabel = dateObj.toLocaleDateString('default', { month: 'short', day: 'numeric' });
 
       html += `
@@ -2130,7 +2390,7 @@
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
     const thisMonthKey = currentMonthKey(now);
-    const metrics = currentMetrics || getMonthBudgetModel(now);
+    const metrics = getMonthBudgetModel(now);
     const budget = metrics.budget;
     const sym = state.settings.currency;
 
@@ -2139,7 +2399,7 @@
     const prevMonthName = prevDate.toLocaleString('default', { month: 'long', year: 'numeric' });
     const currMonthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    const prevModel = getMonthBudgetModel(prevDate);
+    const prevModel = getMonthBudgetModel(prevDate, { useExpectedFloor: true });
     const prevFunSpent = prevModel.funSpent;
     const prevBudget = prevModel.budget;
     const prevOverspend = prevFunSpent - prevBudget;
@@ -2159,8 +2419,13 @@
       state.pendingTargetMonth = thisMonthKey;
       state.pendingTargetMonthName = currMonthName;
 
-      dom.overspendBannerTitle.textContent = `${prevMonthName} Over Daily Pot`;
-      dom.overspendBannerDesc.textContent = `Fun spending exceeded the derived daily pot by ${sym}${prevOverspend.toFixed(2)} (${sym}${prevFunSpent.toFixed(2)} vs ${sym}${prevBudget.toFixed(2)}). Set a recovery savings goal for ${currMonthName}?`;
+      if (!isAnalyticsLiveMonth()) {
+        dom.overspendRecoveryBanner.classList.add('hidden');
+        return;
+      }
+
+      dom.overspendBannerTitle.textContent = `${prevMonthName} Over Spendable`;
+      dom.overspendBannerDesc.textContent = `Fun spending exceeded spendable by ${sym}${prevOverspend.toFixed(2)} (${sym}${prevFunSpent.toFixed(2)} vs ${sym}${prevBudget.toFixed(2)}). Set a recovery savings goal for ${currMonthName}?`;
       dom.rollOverspendBtnText.textContent = `Make ${currMonthName} Goal (${sym}${prevOverspend.toFixed(2)})`;
       dom.overspendRecoveryBanner.classList.remove('hidden');
       return;
@@ -2181,8 +2446,13 @@
       state.pendingTargetMonth = nextMonthKey;
       state.pendingTargetMonthName = nextMonthName;
 
-      dom.overspendBannerTitle.textContent = `Current Month Over Daily Pot`;
-      dom.overspendBannerDesc.textContent = `You are ${sym}${currOverspend.toFixed(2)} over the derived daily pot (${sym}${metrics.funSpent.toFixed(2)} spent of ${sym}${budget.toFixed(2)}). Roll this into a savings goal for ${nextMonthName}?`;
+      if (!isAnalyticsLiveMonth()) {
+        dom.overspendRecoveryBanner.classList.add('hidden');
+        return;
+      }
+
+      dom.overspendBannerTitle.textContent = `This Month Over Spendable`;
+      dom.overspendBannerDesc.textContent = `You are ${sym}${currOverspend.toFixed(2)} over spendable (${sym}${metrics.funSpent.toFixed(2)} spent of ${sym}${budget.toFixed(2)}). Roll this into a savings goal for ${nextMonthName}?`;
       dom.rollOverspendBtnText.textContent = `Make ${nextMonthName} Goal (${sym}${currOverspend.toFixed(2)})`;
       dom.overspendRecoveryBanner.classList.remove('hidden');
       return;
@@ -4162,6 +4432,7 @@
     setupCategoryModal();
     setupRecurringManager();
     setupHistorySubTabs();
+    setupInsightsPeriodNav();
     setupEditTransactionModal();
     setupSavingsGoalsManager();
     renderRecurringList();

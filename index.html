@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="index.css?v=12">
+  <link rel="stylesheet" href="index.css?v=13">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -165,6 +165,7 @@
               </div>
               <div class="glance-sub" id="glanceDailySafe">
                 Daily available: <strong id="glanceDailyAmount">$45.00/day</strong>
+                <span class="glance-hint">Skip a day and this goes up tomorrow</span>
               </div>
             </div>
 
@@ -343,18 +344,30 @@
         
         <div class="view-header">
           <h2 class="view-title">Insights & Budget</h2>
-          <div class="timeframe-toggle">
-            <button type="button" class="time-tab active" data-range="month">This Month</button>
-            <button type="button" class="time-tab" data-range="all">All Time</button>
+          <div class="insights-period-bar">
+            <div class="insights-month-nav">
+              <button type="button" id="analyticsPrevMonthBtn" class="period-nav-btn" aria-label="Previous month">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>
+              <button type="button" id="analyticsPeriodLabelBtn" class="period-label-btn" title="Jump to this month">This Month</button>
+              <button type="button" id="analyticsNextMonthBtn" class="period-nav-btn" aria-label="Next month">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
+            <button type="button" id="analyticsAllTimeBtn" class="time-tab period-all-btn">All Time</button>
           </div>
         </div>
 
         <!-- Cash Flow / Income & Expenses Overview Card -->
         <div class="analytics-card cashflow-card">
-          <span class="card-caption">Monthly Cash Flow</span>
+          <span class="card-caption" id="analyticsCashflowCaption">This month's cash flow</span>
           <div class="cashflow-grid">
             <div class="cashflow-item income-item">
-              <span class="cashflow-label">Projected Income</span>
+              <span class="cashflow-label" id="analyticsIncomeLabel">Projected Income</span>
               <span class="cashflow-value" id="analyticsTotalIncome">+$0.00</span>
               <span class="cashflow-hint" id="analyticsIncomeHint">Received $0.00 of $0.00 expected</span>
             </div>
@@ -367,20 +380,20 @@
               <span class="cashflow-value" id="analyticsNetBalance">$0.00</span>
             </div>
           </div>
-          <div class="cashflow-sub-row" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-subtle); font-size: 0.8rem; color: var(--text-muted);">
+          <div class="cashflow-sub-row js-month-only" id="analyticsBillsHeldRow" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-subtle); font-size: 0.8rem; color: var(--text-muted);">
             <span>Bills held this month:</span>
             <strong id="analyticsRecurringTotal" style="color: var(--text-primary); font-family: var(--font-display);">$0.00/mo</strong>
           </div>
         </div>
 
         <!-- Monthly Budget Overview Card -->
-        <div class="analytics-card budget-meter-card">
+        <div class="analytics-card budget-meter-card js-month-only">
           <div class="budget-meter-header">
             <div>
-              <span class="card-caption">Daily pot (from income)</span>
+              <span class="card-caption" id="analyticsSpendableCaption">Spendable this month</span>
               <div class="budget-main-numbers">
                 <span class="spent-number" id="analyticsSpent">$0.00</span>
-                <span class="limit-caption" id="analyticsBudgetLimit">of $0.00 daily pot</span>
+                <span class="limit-caption" id="analyticsBudgetLimit">of $0.00 spendable</span>
               </div>
             </div>
             <div class="budget-percentage-badge" id="budgetPercentageBadge">0%</div>
@@ -399,15 +412,16 @@
             </div>
             <div class="pace-divider"></div>
             <div class="pace-item">
-              <span class="pace-label">Daily available</span>
+              <span class="pace-label" id="analyticsDailyPaceLabel">Daily available</span>
               <span class="pace-val highlight" id="analyticsDailyPace">$66.60 / day</span>
             </div>
             <div class="pace-divider"></div>
             <div class="pace-item">
-              <span class="pace-label">Days Left</span>
+              <span class="pace-label" id="analyticsDaysLeftLabel">Days left</span>
               <span class="pace-val" id="analyticsDaysLeft">30</span>
             </div>
           </div>
+          <p class="pace-hint" id="analyticsDailyHint">Skip a day and tomorrow’s daily number goes up. Leftover stays in the month.</p>
 
           <div class="budget-waterfall" id="budgetWaterfall"></div>
         </div>
@@ -488,7 +502,7 @@
         </div>
 
         <!-- Upcoming Bills This Month -->
-        <div class="analytics-card upcoming-bills-card">
+        <div class="analytics-card upcoming-bills-card js-month-only">
           <div class="section-title-row" style="margin-bottom: 8px;">
             <h3 class="card-subtitle" style="margin-bottom: 0;">Upcoming Bills</h3>
             <span class="upcoming-count-badge" id="upcomingBillsCount">0 this month</span>
@@ -499,7 +513,7 @@
         </div>
 
         <!-- Per-Category Budget Limits Card -->
-        <div class="analytics-card">
+        <div class="analytics-card js-month-only" id="categoryTrackingCard">
           <div class="section-title-row" style="margin-bottom: 12px;">
             <h3 class="card-subtitle" style="margin-bottom: 0;">Category tracking</h3>
             <button type="button" class="text-link-btn" id="editBudgetsLinkBtn">Edit Limits</button>
@@ -1139,6 +1153,6 @@
 
   </div>
 
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

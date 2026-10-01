@@ -386,6 +386,10 @@ html, body {
 }
 
 .glance-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
@@ -393,6 +397,12 @@ html, body {
 .glance-sub strong {
   color: var(--text-main);
   font-weight: 600;
+}
+
+.glance-hint {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 /* Speed Entry Card */
@@ -1204,6 +1214,76 @@ html, body {
   margin-top: 8px;
 }
 
+.insights-period-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.insights-month-nav {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+}
+
+.period-nav-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.period-nav-btn:hover:not(:disabled) {
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+
+.period-nav-btn:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+.period-label-btn {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 6px 4px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--text-main);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.period-all-btn {
+  flex: 0 0 auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .time-tab {
   flex: 1;
   background: none;
@@ -1217,10 +1297,23 @@ html, body {
   transition: all var(--transition-fast);
 }
 
-.time-tab.active {
+.time-tab.active,
+.period-all-btn.active {
   background: var(--bg-surface);
   color: var(--text-main);
   border: 1px solid var(--border-subtle);
+}
+
+.pace-hint {
+  margin: 10px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+#view-analytics.insights-all-time .js-month-only {
+  display: none !important;
 }
 
 .analytics-card {
